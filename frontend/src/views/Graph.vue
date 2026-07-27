@@ -9,7 +9,13 @@
     </div>
 
     <div class="flex gap-2 mb-4 flex-wrap items-center text-sm">
-      <span v-for="dt in deviceTypes" :key="dt.type" class="flex items-center gap-1"><span class="w-3 h-3 rounded-sm" :style="{ background: dt.color }"></span> {{ dt.label }}</span>
+      <button v-for="dt in deviceTypes" :key="dt.type"
+        class="btn btn-xs gap-1"
+        :class="hiddenTypes.includes(dt.type) ? 'btn-outline opacity-40' : 'btn-ghost'"
+        @click="toggleType(dt.type)">
+        <span class="w-3 h-3 rounded-sm" :style="{ background: dt.color }"></span>
+        {{ dt.label }}
+      </button>
     </div>
 
     <div id="graph-container"></div>
@@ -30,6 +36,7 @@ const router = useRouter()
 let cy = null
 
 const deviceTypes = ref([])
+const hiddenTypes = ref([])
 
 const typeColors = computed(() => {
   const map = {}
@@ -272,9 +279,37 @@ function buildGraph(data) {
       const deviceId = nodeId.replace('dev-', '')
       router.push(`/devices/${deviceId}`)
     })
+
+    applyVisibility()
   })
 
   layout.run()
+}
+
+function toggleType(type) {
+  const idx = hiddenTypes.value.indexOf(type)
+  if (idx >= 0) {
+    hiddenTypes.value.splice(idx, 1)
+  } else {
+    hiddenTypes.value.push(type)
+  }
+  applyVisibility()
+}
+
+function applyVisibility() {
+  if (!cy) return
+  const allTypes = deviceTypes.value.map(dt => dt.type)
+  for (const t of allTypes) {
+    const visible = !hiddenTypes.value.includes(t)
+    cy.nodes(`node:childless[type = "${t}"]`).style('display', visible ? 'element' : 'none')
+  }
+  const visibleNodes = cy.nodes('node:childless').filter(n => n.style('display') !== 'none')
+  const visibleIds = new Set(visibleNodes.map(n => n.id()))
+  cy.edges().forEach(edge => {
+    const src = edge.source().id()
+    const tgt = edge.target().id()
+    edge.style('display', visibleIds.has(src) && visibleIds.has(tgt) ? 'element' : 'none')
+  })
 }
 
 async function refreshGraph() {
