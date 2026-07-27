@@ -210,7 +210,7 @@ function buildGraph(data) {
     cy.on('dblclick', 'node:childless', (evt) => {
       const nodeId = evt.target.id()
       const deviceId = nodeId.replace('dev-', '')
-      router.push(`/device/${deviceId}`)
+      router.push(`/devices/${deviceId}`)
     })
   })
 }
