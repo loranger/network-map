@@ -158,11 +158,11 @@ function buildGraph(data) {
           'font-weight': 'bold',
           'font-size': '14px',
           color: 'data(color)',
-          'padding': '60px',
+          'padding': '50px',
           'shape': 'round-rectangle',
           'compound-sizing-wrt-labels': 'include',
-          'min-width': '200px',
-          'min-height': '150px',
+          'min-width': '150px',
+          'min-height': '100px',
         },
       },
       {
@@ -251,14 +251,14 @@ function buildGraph(data) {
   const layout = cy.layout({
     name: 'fcose',
     animate: false,
-    nodeRepulsion: 20000,
-    idealEdgeLength: 150,
-    edgeElasticity: 0.1,
+    nodeRepulsion: 8000,
+    idealEdgeLength: 120,
+    edgeElasticity: 0.45,
     nestingFactor: 1.5,
-    gravity: 0.05,
-    gravityCompound: 1.0,
-    gravityRangeCompound: 1.0,
-    numIter: 5000,
+    gravity: 0.25,
+    gravityCompound: 2.0,
+    gravityRangeCompound: 2.0,
+    numIter: 4000,
     numIter: 2500,
     tile: true,
     packComponents: true,
@@ -281,6 +281,7 @@ function buildGraph(data) {
       router.push(`/devices/${deviceId}`)
     })
 
+    removeOverlaps()
     applyVisibility()
   })
 
@@ -323,6 +324,40 @@ function applyVisibility() {
   cy.nodes('node.floor').forEach(floor => {
     floor.style('display', hasVisibleChild(floor) ? 'element' : 'none')
   })
+}
+
+function removeOverlaps() {
+  for (let pass = 0; pass < 5; pass++) {
+    let moved = false
+    const locs = cy.nodes('node.location')
+    for (let i = 0; i < locs.length; i++) {
+      for (let j = i + 1; j < locs.length; j++) {
+        const a = locs[i], b = locs[j]
+        if (a.parent().id() !== b.parent().id()) continue
+        if (a.style('display') === 'none' || b.style('display') === 'none') continue
+
+        const bbA = a.boundingBox(), bbB = b.boundingBox()
+        const overlapX = Math.max(0, Math.min(bbA.x2, bbB.x2) - Math.max(bbA.x1, bbB.x1))
+        const overlapY = Math.max(0, Math.min(bbA.y2, bbB.y2) - Math.max(bbA.y1, bbB.y1))
+
+        if (overlapX > 0 && overlapY > 0) {
+          const dx = bbB.x - bbA.x
+          const dy = bbB.y - bbA.y
+          const dist = Math.sqrt(dx * dx + dy * dy)
+          const gap = 20
+          if (dist < 1) {
+            b.position({ x: bbB.x + 80, y: bbB.y })
+          } else {
+            const sx = (overlapX + gap) * (dx / dist)
+            const sy = (overlapY + gap) * (dy / dist)
+            b.position({ x: bbB.x + sx, y: bbB.y + sy })
+          }
+          moved = true
+        }
+      }
+    }
+    if (!moved) break
+  }
 }
 
 async function refreshGraph() {
