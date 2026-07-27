@@ -250,7 +250,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
 
@@ -384,4 +384,11 @@ async function deleteConnection(id) {
 }
 
 onMounted(fetchData)
+
+watch(() => route.params.id, (newId, oldId) => {
+  if (newId !== oldId) {
+    device.value = null
+    fetchData()
+  }
+})
 </script>
