@@ -92,7 +92,7 @@ function buildGraph(data) {
         id: `edge-${e.from}-${e.to}`,
         source: `dev-${e.from}`,
         target: `dev-${e.to}`,
-        label: e.technology || e.type,
+        label: e.label,
         color: edgeColor,
       },
       classes: e.dashes ? 'wireless' : undefined,
