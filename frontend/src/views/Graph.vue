@@ -310,6 +310,18 @@ function applyVisibility() {
     const tgt = edge.target().id()
     edge.style('display', visibleIds.has(src) && visibleIds.has(tgt) ? 'element' : 'none')
   })
+
+  const hasVisibleChild = node => {
+    if (!node.isParent()) return node.style('display') !== 'none'
+    return node.children().some(c => hasVisibleChild(c))
+  }
+
+  cy.nodes('node.location').forEach(loc => {
+    loc.style('display', hasVisibleChild(loc) ? 'element' : 'none')
+  })
+  cy.nodes('node.floor').forEach(floor => {
+    floor.style('display', hasVisibleChild(floor) ? 'element' : 'none')
+  })
 }
 
 async function refreshGraph() {
