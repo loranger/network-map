@@ -93,7 +93,14 @@ import axios from 'axios'
 import { Plus, Pencil, Trash2 } from '@lucide/vue'
 
 const types = ref([])
-const form = ref({ type: '', label: '', color: '#6b7280' })
+function randomDarkColor() {
+  const h = Math.floor(Math.random() * 360)
+  const s = 50 + Math.floor(Math.random() * 30)
+  const l = 25 + Math.floor(Math.random() * 25)
+  return `hsl(${h}, ${s}%, ${l}%)`
+}
+
+const form = ref({ type: '', label: '', color: randomDarkColor() })
 const editForm = ref({ label: '', color: '' })
 
 async function fetchTypes() {
@@ -103,7 +110,7 @@ async function fetchTypes() {
 
 async function addType() {
   await axios.post('/api/device-types', form.value)
-  form.value = { type: '', label: '', color: '#6b7280' }
+  form.value = { type: '', label: '', color: randomDarkColor() }
   document.getElementById('dt_modal').close()
   fetchTypes()
 }
