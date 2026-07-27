@@ -125,6 +125,15 @@ class NetworkCreate(NetworkBase):
     pass
 
 
+class NetworkUpdate(BaseModel):
+    name: Optional[str] = None
+    ssid: Optional[str] = None
+    type: Optional[str] = None
+    subnet: Optional[str] = None
+    gateway: Optional[str] = None
+    dns: Optional[str] = None
+
+
 class NetworkResponse(NetworkBase):
     id: int
 

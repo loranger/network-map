@@ -321,6 +321,14 @@ def delete_network(network_id: int, db: Session = Depends(get_db)):
     return {"ok": True}
 
 
+@app.put("/api/networks/{network_id}", response_model=schemas.NetworkResponse)
+def update_network(network_id: int, net: schemas.NetworkUpdate, db: Session = Depends(get_db)):
+    updated = crud.update_network(db, network_id, net)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Network not found")
+    return updated
+
+
 @app.post("/api/scan")
 def scan(db: Session = Depends(get_db)):
     from .scanner import scan_network

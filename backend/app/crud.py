@@ -165,6 +165,16 @@ def delete_network(db: Session, network_id: int):
     return db_network
 
 
+def update_network(db: Session, network_id: int, net: schemas.NetworkUpdate):
+    db_net = db.query(models.Network).filter(models.Network.id == network_id).first()
+    if db_net:
+        for key, value in net.model_dump(exclude_unset=True).items():
+            setattr(db_net, key, value)
+        db.commit()
+        db.refresh(db_net)
+    return db_net
+
+
 # --- Locations ---
 
 def get_locations(db: Session):
