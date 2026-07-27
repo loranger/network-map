@@ -25,7 +25,10 @@
 <script setup>
 import { onMounted, onBeforeUnmount } from 'vue'
 import cytoscape from 'cytoscape'
+import fcose from 'cytoscape-fcose'
 import axios from 'axios'
+
+cytoscape.use(fcose)
 
 let cy = null
 
@@ -168,16 +171,18 @@ function buildGraph(data) {
       },
     ],
     layout: {
-      name: 'cose',
+      name: 'fcose',
       animate: false,
-      nodeRepulsion: 8000,
-      nodeOverlap: 100,
-      idealEdgeLength: 120,
-      edgeElasticity: 100,
-      nestingFactor: 1.5,
-      gravity: 0.8,
-      numIter: 1000,
+      nodeRepulsion: 4500,
+      idealEdgeLength: 100,
+      edgeElasticity: 0.45,
+      nestingFactor: 1.8,
+      gravity: 0.25,
+      gravityCompound: 1.5,
+      gravityRangeCompound: 1.5,
+      numIter: 2500,
       tile: true,
+      packComponents: true,
     },
     zoomingEnabled: true,
     userZoomingEnabled: true,
