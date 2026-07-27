@@ -36,17 +36,38 @@ async def lifespan(app: FastAPI):
         existing = session.query(models.Location).count()
         if existing == 0:
             rows = session.execute(
-                sql_text("SELECT DISTINCT floor, location FROM devices WHERE location IS NOT NULL")
+                sql_text("SELECT DISTINCT location FROM devices WHERE location IS NOT NULL")
             ).all()
-            for floor, location in rows:
+            for (location,) in rows:
+                floor_row = session.execute(
+                    sql_text("SELECT floor FROM devices WHERE location = :loc AND floor IS NOT NULL LIMIT 1"),
+                    {"loc": location}
+                ).first()
+                floor = floor_row[0] if floor_row else None
                 session.add(models.Location(name=location, floor=floor))
             session.commit()
+            loc_map = {}
+            for loc in session.query(models.Location).all():
+                loc_map[loc.name] = loc
             for device in session.query(models.Device).filter(models.Device.location.isnot(None)):
-                loc = session.query(models.Location).filter_by(
-                    name=device.location, floor=device.floor
-                ).first()
+                loc = loc_map.get(device.location)
                 if loc:
                     device.location_id = loc.id
+            session.commit()
+        else:
+            dup_names = session.execute(
+                sql_text("SELECT name FROM locations GROUP BY name HAVING COUNT(*) > 1")
+            ).all()
+            for (name,) in dup_names:
+                duplicates = session.query(models.Location).filter(
+                    models.Location.name == name
+                ).order_by(models.Location.floor.is_(None)).all()
+                keep = duplicates[0]
+                for dup in duplicates[1:]:
+                    session.query(models.Device).filter(
+                        models.Device.location_id == dup.id
+                    ).update({"location_id": keep.id})
+                    session.delete(dup)
             session.commit()
     yield
 
