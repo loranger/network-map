@@ -245,7 +245,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
-import { ArrowLeft, Plus, Link2, Trash2, Pencil, Info } from 'lucide-vue-next'
+import { ArrowLeft, Plus, Link2, Trash2, Pencil, Info } from '@lucide/vue'
 
 const route = useRoute()
 const router = useRouter()

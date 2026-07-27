@@ -83,7 +83,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
-import { Plus, Trash2 } from 'lucide-vue-next'
+import { Plus, Trash2 } from '@lucide/vue'
 
 const networks = ref([])
 const form = ref({ name: '', type: 'wifi', ssid: '', subnet: '', gateway: '' })

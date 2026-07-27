@@ -77,7 +77,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
-import { Plus, Pencil, Trash2 } from 'lucide-vue-next'
+import { Plus, Pencil, Trash2 } from '@lucide/vue'
 
 const locations = ref([])
 const form = ref({ name: '', floor: '' })

@@ -58,5 +58,5 @@
 </template>
 
 <script setup>
-import { Menu, Monitor, Network, Wifi, MapPin, Palette } from 'lucide-vue-next'
+import { Menu, Monitor, Network, Wifi, MapPin, Palette } from '@lucide/vue'
 </script>

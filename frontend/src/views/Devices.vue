@@ -160,7 +160,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import axios from 'axios'
-import { Search, Download, Info, Plus, Trash2, Check, X } from 'lucide-vue-next'
+import { Search, Download, Info, Plus, Trash2, Check, X } from '@lucide/vue'
 
 const devices = ref([])
 const locations = ref([])

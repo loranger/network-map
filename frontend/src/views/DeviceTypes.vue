@@ -90,7 +90,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
-import { Plus, Pencil, Trash2 } from 'lucide-vue-next'
+import { Plus, Pencil, Trash2 } from '@lucide/vue'
 
 const types = ref([])
 const form = ref({ type: '', label: '', color: '#6b7280' })

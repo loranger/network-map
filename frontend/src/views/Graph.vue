@@ -22,7 +22,7 @@ import { useRouter } from 'vue-router'
 import cytoscape from 'cytoscape'
 import fcose from 'cytoscape-fcose'
 import axios from 'axios'
-import { RefreshCw } from 'lucide-vue-next'
+import { RefreshCw } from '@lucide/vue'
 
 cytoscape.use(fcose)
 
