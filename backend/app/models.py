@@ -84,6 +84,15 @@ class Connection(Base):
                             foreign_keys=[device_b_id])
 
 
+class DeviceType(Base):
+    __tablename__ = "device_types"
+
+    id = Column(Integer, primary_key=True, index=True)
+    type = Column(String, unique=True, nullable=False)
+    label = Column(String, nullable=False)
+    color = Column(String, nullable=False)
+
+
 class Network(Base):
     __tablename__ = "networks"
 

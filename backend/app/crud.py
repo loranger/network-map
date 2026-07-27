@@ -196,6 +196,38 @@ def update_location(db: Session, loc_id: int, loc: schemas.LocationUpdate):
     return db_loc
 
 
+# --- Device Types ---
+
+def get_device_types(db: Session):
+    return db.query(models.DeviceType).all()
+
+
+def create_device_type(db: Session, dt: schemas.DeviceTypeCreate):
+    db_dt = models.DeviceType(**dt.model_dump())
+    db.add(db_dt)
+    db.commit()
+    db.refresh(db_dt)
+    return db_dt
+
+
+def update_device_type(db: Session, dt_id: int, dt: schemas.DeviceTypeUpdate):
+    db_dt = db.query(models.DeviceType).filter(models.DeviceType.id == dt_id).first()
+    if db_dt:
+        for key, value in dt.model_dump(exclude_unset=True).items():
+            setattr(db_dt, key, value)
+        db.commit()
+        db.refresh(db_dt)
+    return db_dt
+
+
+def delete_device_type(db: Session, dt_id: int):
+    db_dt = db.query(models.DeviceType).filter(models.DeviceType.id == dt_id).first()
+    if db_dt:
+        db.delete(db_dt)
+        db.commit()
+    return db_dt
+
+
 # --- Graph ---
 
 def get_graph_data(db: Session) -> schemas.GraphData:
@@ -204,16 +236,9 @@ def get_graph_data(db: Session) -> schemas.GraphData:
     ).all()
     connections = db.query(models.Connection).all()
 
-    type_colors = {
-        "router": "#3b82f6",
-        "modem": "#8b5cf6",
-        "ap": "#06b6d4",
-        "switch": "#f59e0b",
-        "computer": "#10b981",
-        "server": "#ef4444",
-        "iot": "#ec4899",
-        "other": "#6b7280",
-    }
+    type_colors = {}
+    for dt in db.query(models.DeviceType).all():
+        type_colors[dt.type] = dt.color
 
     nodes = []
     for d in devices:

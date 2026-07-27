@@ -9,13 +9,7 @@
     </div>
 
     <div class="flex gap-2 mb-4 flex-wrap items-center text-sm">
-      <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-sm" style="background:#3b82f6"></span> Routeur</span>
-      <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-sm" style="background:#8b5cf6"></span> Modem</span>
-      <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-sm" style="background:#06b6d4"></span> AP</span>
-      <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-sm" style="background:#f59e0b"></span> Switch</span>
-      <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-sm" style="background:#10b981"></span> Ordinateur</span>
-      <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-sm" style="background:#ef4444"></span> Serveur</span>
-      <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-sm" style="background:#ec4899"></span> IoT</span>
+      <span v-for="dt in deviceTypes" :key="dt.type" class="flex items-center gap-1"><span class="w-3 h-3 rounded-sm" :style="{ background: dt.color }"></span> {{ dt.label }}</span>
     </div>
 
     <div id="graph-container"></div>
@@ -23,7 +17,7 @@
 </template>
 
 <script setup>
-import { onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import cytoscape from 'cytoscape'
 import fcose from 'cytoscape-fcose'
@@ -34,11 +28,15 @@ cytoscape.use(fcose)
 const router = useRouter()
 let cy = null
 
-const typeColors = {
-  router: '#3b82f6', modem: '#8b5cf6', ap: '#06b6d4',
-  switch: '#f59e0b', computer: '#10b981', server: '#ef4444',
-  iot: '#ec4899', other: '#6b7280',
-}
+const deviceTypes = ref([])
+
+const typeColors = computed(() => {
+  const map = {}
+  for (const dt of deviceTypes.value) {
+    map[dt.type] = dt.color
+  }
+  return map
+})
 
 const locationColorPalette = [
   '#6366f1', '#a855f7', '#ec4899', '#f43f5e', '#f97316',
@@ -184,7 +182,7 @@ function buildGraph(data) {
         selector: 'node:childless',
         style: {
           label: 'data(label)',
-          'background-color': (el) => typeColors[el.data('type')] || typeColors.other,
+          'background-color': (el) => typeColors.value[el.data('type')] || '#6b7280',
           'border-color': (el) => {
             const parent = el.parent()
             return parent.length ? parent.data('color') : '#4b5563'
@@ -279,7 +277,11 @@ function buildGraph(data) {
 }
 
 async function refreshGraph() {
-  const { data } = await axios.get('/api/graph')
+  const [{ data }, dtRes] = await Promise.all([
+    axios.get('/api/graph'),
+    axios.get('/api/device-types'),
+  ])
+  deviceTypes.value = dtRes.data
   if (cy) {
     cy.destroy()
     cy = null

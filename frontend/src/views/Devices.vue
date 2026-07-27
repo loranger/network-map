@@ -28,14 +28,7 @@
       <input v-model="filterName" type="search" placeholder="Rechercher…" class="input input-bordered input-sm flex-1 min-w-[160px]" />
       <select class="select select-bordered select-sm" v-model="filterType">
         <option value="">Tous les types</option>
-        <option value="router">Routeur</option>
-        <option value="modem">Modem</option>
-        <option value="ap">Point d'accès</option>
-        <option value="switch">Switch</option>
-        <option value="computer">Ordinateur</option>
-        <option value="server">Serveur</option>
-        <option value="iot">IoT</option>
-        <option value="other">Autre</option>
+        <option v-for="dt in deviceTypes" :key="dt.type" :value="dt.type">{{ dt.label }}</option>
       </select>
       <select class="select select-bordered select-sm" v-model="filterLocation">
         <option value="">Tous les emplacements</option>
@@ -65,7 +58,7 @@
               <router-link :to="`/devices/${d.id}`" class="link link-hover">{{ capitalize(d.name) }}</router-link>
             </td>
             <td class="hidden md:table-cell">
-              <span class="badge" :class="badgeClass(d.device_type)">{{ capitalize(d.device_type) }}</span>
+              <span class="badge text-white border-0" :style="{ backgroundColor: typeColor(d.device_type) }">{{ capitalize(d.device_type) }}</span>
             </td>
             <td class="hidden sm:table-cell font-mono text-sm">{{ d.ipv4 || '-' }}</td>
             <td class="hidden sm:table-cell text-sm">
@@ -136,14 +129,7 @@
           <div class="form-control mb-3">
             <label class="label"><span class="label-text">Type</span></label>
             <select v-model="form.device_type" class="select select-bordered" required>
-              <option value="computer">Ordinateur</option>
-              <option value="router">Routeur</option>
-              <option value="modem">Modem</option>
-              <option value="ap">Point d'accès</option>
-              <option value="switch">Switch</option>
-              <option value="server">Serveur</option>
-              <option value="iot">IoT</option>
-              <option value="other">Autre</option>
+              <option v-for="dt in deviceTypes" :key="dt.type" :value="dt.type">{{ dt.label }}</option>
             </select>
           </div>
           <div class="form-control mb-3">
@@ -177,6 +163,7 @@ import axios from 'axios'
 
 const devices = ref([])
 const locations = ref([])
+const deviceTypes = ref([])
 const filterName = ref('')
 const filterType = ref('')
 const filterLocation = ref('')
@@ -200,13 +187,9 @@ function capitalize(s) {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''
 }
 
-function badgeClass(type) {
-  const map = {
-    router: 'badge-info', modem: 'badge-secondary', ap: 'badge-accent',
-    switch: 'badge-warning', computer: 'badge-success', server: 'badge-error',
-    iot: 'badge-ghost',
-  }
-  return map[type] || ''
+function typeColor(type) {
+  const found = deviceTypes.value.find(dt => dt.type === type)
+  return found ? found.color : '#6b7280'
 }
 
 async function fetchDevices() {
@@ -217,6 +200,11 @@ async function fetchDevices() {
 async function fetchLocations() {
   const { data } = await axios.get('/api/locations')
   locations.value = data
+}
+
+async function fetchDeviceTypes() {
+  const { data } = await axios.get('/api/device-types')
+  deviceTypes.value = data
 }
 
 async function addDevice() {
@@ -284,5 +272,6 @@ async function importArp() {
 onMounted(() => {
   fetchDevices()
   fetchLocations()
+  fetchDeviceTypes()
 })
 </script>

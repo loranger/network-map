@@ -131,6 +131,27 @@ class NetworkResponse(NetworkBase):
     model_config = {"from_attributes": True}
 
 
+class DeviceTypeBase(BaseModel):
+    type: str
+    label: str
+    color: str
+
+
+class DeviceTypeCreate(DeviceTypeBase):
+    pass
+
+
+class DeviceTypeUpdate(BaseModel):
+    label: Optional[str] = None
+    color: Optional[str] = None
+
+
+class DeviceTypeResponse(DeviceTypeBase):
+    id: int
+
+    model_config = {"from_attributes": True}
+
+
 class GraphData(BaseModel):
     nodes: list[dict]
     edges: list[dict]

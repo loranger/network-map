@@ -64,6 +64,20 @@ async def lifespan(app: FastAPI):
                 if loc:
                     device.location_id = loc.id
             session.commit()
+        if session.query(models.DeviceType).count() == 0:
+            defaults = [
+                models.DeviceType(type="router", label="Routeur", color="#3b82f6"),
+                models.DeviceType(type="modem", label="Modem", color="#8b5cf6"),
+                models.DeviceType(type="ap", label="Point d'accès", color="#06b6d4"),
+                models.DeviceType(type="switch", label="Switch", color="#f59e0b"),
+                models.DeviceType(type="computer", label="Ordinateur", color="#10b981"),
+                models.DeviceType(type="server", label="Serveur", color="#ef4444"),
+                models.DeviceType(type="iot", label="IoT", color="#ec4899"),
+                models.DeviceType(type="other", label="Autre", color="#6b7280"),
+            ]
+            for dt in defaults:
+                session.add(dt)
+            session.commit()
     yield
 
 
@@ -253,6 +267,41 @@ def update_location(loc_id: int, loc: schemas.LocationUpdate, db: Session = Depe
         raise HTTPException(status_code=404, detail="Location not found")
     return updated
 
+
+# --- Device Types ---
+
+@app.get("/api/device-types", response_model=list[schemas.DeviceTypeResponse])
+def list_device_types(db: Session = Depends(get_db)):
+    return crud.get_device_types(db)
+
+
+@app.post("/api/device-types", response_model=schemas.DeviceTypeResponse)
+def create_device_type(dt: schemas.DeviceTypeCreate, db: Session = Depends(get_db)):
+    existing = db.query(models.DeviceType).filter(
+        models.DeviceType.type == dt.type
+    ).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Device type already exists")
+    return crud.create_device_type(db, dt)
+
+
+@app.put("/api/device-types/{dt_id}", response_model=schemas.DeviceTypeResponse)
+def update_device_type(dt_id: int, dt: schemas.DeviceTypeUpdate, db: Session = Depends(get_db)):
+    updated = crud.update_device_type(db, dt_id, dt)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Device type not found")
+    return updated
+
+
+@app.delete("/api/device-types/{dt_id}")
+def delete_device_type(dt_id: int, db: Session = Depends(get_db)):
+    deleted = crud.delete_device_type(db, dt_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Device type not found")
+    return {"ok": True}
+
+
+# --- Networks ---
 
 @app.get("/api/networks", response_model=list[schemas.NetworkResponse])
 def list_networks(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):

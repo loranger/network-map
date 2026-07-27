@@ -5,7 +5,7 @@
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
       </router-link>
       <h1 class="text-2xl font-bold">{{ capitalize(device.name) }}</h1>
-      <span class="badge badge-lg" :class="badgeClass(device.device_type)">{{ capitalize(device.device_type) }}</span>
+      <span class="badge badge-lg text-white border-0" :style="{ backgroundColor: typeColor(device.device_type) }">{{ capitalize(device.device_type) }}</span>
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -141,14 +141,7 @@
           <div class="form-control mb-3">
             <label class="label"><span class="label-text">Type</span></label>
             <select v-model="editForm.device_type" class="select select-bordered">
-              <option value="computer">Ordinateur</option>
-              <option value="router">Routeur</option>
-              <option value="modem">Modem</option>
-              <option value="ap">Point d'accès</option>
-              <option value="switch">Switch</option>
-              <option value="server">Serveur</option>
-              <option value="iot">IoT</option>
-              <option value="other">Autre</option>
+              <option v-for="dt in deviceTypes" :key="dt.type" :value="dt.type">{{ dt.label }}</option>
             </select>
           </div>
           <div class="form-control mb-3">
@@ -259,6 +252,7 @@ const device = ref(null)
 const allDevices = ref([])
 const connections = ref([])
 const locations = ref([])
+const deviceTypes = ref([])
 
 const editForm = ref({})
 const portForm = ref({ name: '', vlan: '', poe: false })
@@ -294,13 +288,9 @@ function capitalize(s) {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''
 }
 
-function badgeClass(type) {
-  const map = {
-    router: 'badge-info', modem: 'badge-secondary', ap: 'badge-accent',
-    switch: 'badge-warning', computer: 'badge-success', server: 'badge-error',
-    iot: 'badge-ghost',
-  }
-  return map[type] || ''
+function typeColor(type) {
+  const found = deviceTypes.value.find(dt => dt.type === type)
+  return found ? found.color : '#6b7280'
 }
 
 function navigateTo(id) {
@@ -308,16 +298,18 @@ function navigateTo(id) {
 }
 
 async function fetchData() {
-  const [devRes, devsRes, connRes, locRes] = await Promise.all([
+  const [devRes, devsRes, connRes, locRes, dtRes] = await Promise.all([
     axios.get(`/api/devices/${route.params.id}`),
     axios.get('/api/devices'),
     axios.get('/api/connections'),
     axios.get('/api/locations'),
+    axios.get('/api/device-types'),
   ])
   device.value = devRes.data
   allDevices.value = devsRes.data
   connections.value = connRes.data
   locations.value = locRes.data
+  deviceTypes.value = dtRes.data
   editForm.value = { ...devRes.data }
 }
 
