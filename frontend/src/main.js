@@ -5,6 +5,7 @@ import Devices from './views/Devices.vue'
 import DeviceDetail from './views/DeviceDetail.vue'
 import Graph from './views/Graph.vue'
 import Networks from './views/Networks.vue'
+import Locations from './views/Locations.vue'
 import './style.css'
 
 const routes = [
@@ -13,6 +14,7 @@ const routes = [
   { path: '/devices/:id', component: DeviceDetail },
   { path: '/graph', component: Graph },
   { path: '/networks', component: Networks },
+  { path: '/locations', component: Locations },
 ]
 
 const router = createRouter({

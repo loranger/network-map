@@ -47,12 +47,12 @@
                 <p class="font-mono">{{ device.ipv6 || '-' }}</p>
               </div>
               <div>
-                <label class="text-sm opacity-60">Étage</label>
-                <p>{{ capitalize(device.floor) || '-' }}</p>
+                <label class="text-sm opacity-60">Emplacement</label>
+                <p>{{ capitalize(device.location_name) || '-' }}</p>
               </div>
               <div>
-                <label class="text-sm opacity-60">Emplacement</label>
-                <p>{{ capitalize(device.location) || '-' }}</p>
+                <label class="text-sm opacity-60">Étage</label>
+                <p>{{ capitalize(device.location_floor) || '-' }}</p>
               </div>
               <div>
                 <label class="text-sm opacity-60">Découvert automatiquement</label>
@@ -181,11 +181,10 @@
           </div>
           <div class="form-control mb-3">
             <label class="label"><span class="label-text">Emplacement</span></label>
-            <input v-model="editForm.location" class="input input-bordered" />
-          </div>
-          <div class="form-control mb-3">
-            <label class="label"><span class="label-text">Étage</span></label>
-            <input v-model="editForm.floor" class="input input-bordered" placeholder="ex: RDC, 1er..." />
+            <select v-model="editForm.location_id" class="select select-bordered">
+              <option :value="null">- Aucun -</option>
+              <option v-for="loc in locations" :key="loc.id" :value="loc.id">{{ capitalize(loc.name) }} ({{ loc.floor || '?' }})</option>
+            </select>
           </div>
           <div class="form-control mb-3">
             <label class="label"><span class="label-text">Notes</span></label>
@@ -259,6 +258,7 @@ const router = useRouter()
 const device = ref(null)
 const allDevices = ref([])
 const connections = ref([])
+const locations = ref([])
 
 const editForm = ref({})
 const portForm = ref({ name: '', vlan: '', poe: false })
@@ -308,14 +308,16 @@ function navigateTo(id) {
 }
 
 async function fetchData() {
-  const [devRes, devsRes, connRes] = await Promise.all([
+  const [devRes, devsRes, connRes, locRes] = await Promise.all([
     axios.get(`/api/devices/${route.params.id}`),
     axios.get('/api/devices'),
     axios.get('/api/connections'),
+    axios.get('/api/locations'),
   ])
   device.value = devRes.data
   allDevices.value = devsRes.data
   connections.value = connRes.data
+  locations.value = locRes.data
   editForm.value = { ...devRes.data }
 }
 

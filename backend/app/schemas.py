@@ -24,6 +24,22 @@ class SwitchPortResponse(SwitchPortBase):
     model_config = {"from_attributes": True}
 
 
+class LocationBase(BaseModel):
+    name: str
+    floor: Optional[str] = None
+
+
+class LocationCreate(LocationBase):
+    pass
+
+
+class LocationResponse(LocationBase):
+    id: int
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 class DeviceBase(BaseModel):
     name: str
     device_type: str
@@ -34,8 +50,7 @@ class DeviceBase(BaseModel):
     mac: Optional[str] = None
     ipv4: Optional[str] = None
     ipv6: Optional[str] = None
-    location: Optional[str] = None
-    floor: Optional[str] = None
+    location_id: Optional[int] = None
     notes: Optional[str] = None
 
 
@@ -53,8 +68,7 @@ class DeviceUpdate(BaseModel):
     mac: Optional[str] = None
     ipv4: Optional[str] = None
     ipv6: Optional[str] = None
-    floor: Optional[str] = None
-    location: Optional[str] = None
+    location_id: Optional[int] = None
     notes: Optional[str] = None
 
 
@@ -65,6 +79,8 @@ class DeviceResponse(DeviceBase):
     created_at: datetime
     updated_at: datetime
     ports: list[SwitchPortResponse] = []
+    location_name: Optional[str] = None
+    location_floor: Optional[str] = None
 
     model_config = {"from_attributes": True}
 

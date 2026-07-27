@@ -3,12 +3,18 @@ from sqlalchemy.orm import Session, joinedload
 from . import models, schemas
 
 
+# --- Devices ---
+
 def get_devices(db: Session, skip: int = 0, limit: int = 100):
-    return db.query(models.Device).offset(skip).limit(limit).all()
+    return db.query(models.Device).options(
+        joinedload(models.Device.location_ref)
+    ).offset(skip).limit(limit).all()
 
 
 def get_device(db: Session, device_id: int):
-    return db.query(models.Device).filter(models.Device.id == device_id).first()
+    return db.query(models.Device).options(
+        joinedload(models.Device.location_ref)
+    ).filter(models.Device.id == device_id).first()
 
 
 def create_device(db: Session, device: schemas.DeviceCreate):
@@ -36,6 +42,8 @@ def delete_device(db: Session, device_id: int):
         db.commit()
     return db_device
 
+
+# --- SwitchPorts ---
 
 def get_switch_ports(db: Session, switch_id: int):
     ports = db.query(models.SwitchPort).filter(
@@ -108,6 +116,8 @@ def delete_switch_port(db: Session, port_id: int):
     return db_port
 
 
+# --- Connections ---
+
 def get_connections(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.Connection).offset(skip).limit(limit).all()
 
@@ -129,6 +139,8 @@ def delete_connection(db: Session, conn_id: int):
         db.commit()
     return db_conn
 
+
+# --- Networks ---
 
 def get_networks(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.Network).offset(skip).limit(limit).all()
@@ -152,8 +164,34 @@ def delete_network(db: Session, network_id: int):
     return db_network
 
 
+# --- Locations ---
+
+def get_locations(db: Session):
+    return db.query(models.Location).all()
+
+
+def create_location(db: Session, loc: schemas.LocationCreate):
+    db_loc = models.Location(**loc.model_dump())
+    db.add(db_loc)
+    db.commit()
+    db.refresh(db_loc)
+    return db_loc
+
+
+def delete_location(db: Session, loc_id: int):
+    db_loc = db.query(models.Location).filter(models.Location.id == loc_id).first()
+    if db_loc:
+        db.delete(db_loc)
+        db.commit()
+    return db_loc
+
+
+# --- Graph ---
+
 def get_graph_data(db: Session) -> schemas.GraphData:
-    devices = db.query(models.Device).all()
+    devices = db.query(models.Device).options(
+        joinedload(models.Device.location_ref)
+    ).all()
     connections = db.query(models.Connection).all()
 
     type_colors = {
@@ -169,15 +207,17 @@ def get_graph_data(db: Session) -> schemas.GraphData:
 
     nodes = []
     for d in devices:
+        loc_name = d.location_ref.name if d.location_ref else None
+        loc_floor = d.location_ref.floor if d.location_ref else None
         nodes.append({
             "id": d.id,
             "label": d.name,
-            "title": f"{d.device_type}<br>{d.ipv4 or ''}<br>{d.location or ''}",
+            "title": f"{d.device_type}<br>{d.ipv4 or ''}<br>{loc_name or ''}",
             "color": type_colors.get(d.device_type, "#6b7280"),
             "shape": "box",
             "group": d.device_type,
-            "location": d.location,
-            "floor": d.floor,
+            "location": loc_name,
+            "floor": loc_floor,
         })
 
     edges = []

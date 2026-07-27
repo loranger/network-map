@@ -5,6 +5,17 @@ from sqlalchemy.sql import func
 from .database import Base
 
 
+class Location(Base):
+    __tablename__ = "locations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    floor = Column(String, nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+
+    devices = relationship("Device", back_populates="location_ref")
+
+
 class Device(Base):
     __tablename__ = "devices"
 
@@ -18,14 +29,16 @@ class Device(Base):
     mac = Column(String, nullable=True)
     ipv4 = Column(String, nullable=True)
     ipv6 = Column(String, nullable=True)
-    floor = Column(String, nullable=True)
     location = Column(String, nullable=True)
+    floor = Column(String, nullable=True)
+    location_id = Column(Integer, ForeignKey("locations.id", ondelete="SET NULL"), nullable=True)
     notes = Column(Text, nullable=True)
     discovered = Column(Boolean, default=False)
     last_seen = Column(DateTime, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
+    location_ref = relationship("Location", back_populates="devices")
     ports = relationship("SwitchPort", back_populates="switch",
                          foreign_keys="SwitchPort.switch_id",
                          cascade="all, delete-orphan")

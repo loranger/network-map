@@ -79,15 +79,17 @@ Stocké dans la table `devices`. Représente tout périphérique réseau.
 | ipv6 | String? | Adresse IPv6 |
 | hostname | String? | Nom DNS court |
 | ip_type | String? | static / dhcp |
-| floor | String? | Étage (RDC, 1er, etc.) |
-| location | String? | Emplacement physique |
+| mac | String? | Adresse MAC |
+| ipv4 | String? | Adresse IPv4 |
+| ipv6 | String? | Adresse IPv6 |
+| location_id | Integer FK? | Référence vers locations.id |
 | notes | Text? | Notes libres |
 | discovered | Boolean | Vrai si trouvé par scan automatique |
 | last_seen | DateTime? | Dernière date de détection |
 | created_at | DateTime | Auto |
 | updated_at | DateTime | Auto |
 
-Relations : `ports` (SwitchPort), `connections_a` (Connection), `connections_b` (Connection)
+Relations : `location_ref` (Location), `ports` (SwitchPort), `connections_a` (Connection), `connections_b` (Connection)
 
 ### SwitchPort
 Stocké dans la table `switch_ports`. Ports d'un switch.
@@ -129,6 +131,20 @@ Stocké dans la table `networks`. Réseau logique (WiFi, Mesh, filaire).
 | gateway | String? | Passerelle |
 | dns | String? | DNS |
 
+### Location
+Stocké dans la table `locations`. Emplacement physique avec étage.
+
+| Champ | Type | Notes |
+|---|---|---|
+| id | Integer PK | Auto-incrément |
+| name | String | Nom de l'emplacement |
+| floor | String? | Étage (RDC, 1er, etc.) |
+| created_at | DateTime | Auto |
+
+Relations : `devices` (Device)
+
+Le champ `location_id` (FK → locations.id) est présent sur `Device`. La hiérarchie dans le graphe est : Étage (floor) > Emplacement (location) > Périphérique (device).
+
 ## API REST
 
 Toutes les routes sont préfixées par `/api`.
@@ -158,6 +174,13 @@ Toutes les routes sont préfixées par `/api`.
 | GET | /api/networks | Liste |
 | POST | /api/networks | Création |
 | DELETE | /api/networks/{id} | Suppression |
+
+### Locations
+| Méthode | Route | Description |
+|---|---|---|
+| GET | /api/locations | Liste |
+| POST | /api/locations | Création |
+| DELETE | /api/locations/{id} | Suppression |
 
 ### Utilitaires
 | Méthode | Route | Description |

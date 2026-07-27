@@ -39,7 +39,7 @@
       </select>
       <select class="select select-bordered select-sm" v-model="filterLocation">
         <option value="">Tous les emplacements</option>
-        <option v-for="loc in locations" :key="loc" :value="loc">{{ capitalize(loc) }}</option>
+        <option v-for="loc in locations" :key="loc.id" :value="loc.id">{{ capitalize(loc.name) }}</option>
       </select>
     </div>
 
@@ -75,8 +75,8 @@
             </td>
             <td class="hidden lg:table-cell font-mono text-sm">{{ d.mac || '-' }}</td>
             <td class="hidden xl:table-cell text-sm">{{ d.manufacturer || '-' }}</td>
-            <td>{{ capitalize(d.location) || '-' }}</td>
-            <td class="hidden xl:table-cell">{{ capitalize(d.floor) || '-' }}</td>
+            <td>{{ capitalize(d.location_name) || '-' }}</td>
+            <td class="hidden xl:table-cell">{{ capitalize(d.location_floor) || '-' }}</td>
             <td class="hidden md:table-cell">
               <span v-if="d.discovered" class="text-success">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
@@ -155,12 +155,11 @@
             <input v-model="form.mac" class="input input-bordered" placeholder="XX:XX:XX:XX:XX:XX" />
           </div>
           <div class="form-control mb-3">
-            <label class="label"><span class="label-text">Étage</span></label>
-            <input v-model="form.floor" class="input input-bordered" placeholder="ex: RDC, 1er..." />
-          </div>
-          <div class="form-control mb-3">
             <label class="label"><span class="label-text">Emplacement</span></label>
-            <input v-model="form.location" class="input input-bordered" placeholder="ex: garage, bureau..." />
+            <select v-model="form.location_id" class="select select-bordered">
+              <option :value="null">- Aucun -</option>
+              <option v-for="loc in locations" :key="loc.id" :value="loc.id">{{ capitalize(loc.name) }} ({{ loc.floor || '?' }})</option>
+            </select>
           </div>
           <div class="modal-action">
             <button type="button" class="btn" onclick="add_modal.close()">Annuler</button>
@@ -177,6 +176,7 @@ import { ref, computed, onMounted } from 'vue'
 import axios from 'axios'
 
 const devices = ref([])
+const locations = ref([])
 const filterName = ref('')
 const filterType = ref('')
 const filterLocation = ref('')
@@ -184,19 +184,14 @@ const scanning = ref(false)
 const enriching = ref(false)
 
 const form = ref({
-  name: '', device_type: 'computer', ipv4: '', mac: '', floor: '', location: '',
-})
-
-const locations = computed(() => {
-  const locs = [...new Set(devices.value.map(d => d.location).filter(Boolean))]
-  return locs.sort()
+  name: '', device_type: 'computer', ipv4: '', mac: '', location_id: null,
 })
 
 const filteredDevices = computed(() => {
   return devices.value.filter(d => {
     if (filterName.value && !d.name.toLowerCase().includes(filterName.value.toLowerCase())) return false
     if (filterType.value && d.device_type !== filterType.value) return false
-    if (filterLocation.value && d.location !== filterLocation.value) return false
+    if (filterLocation.value && d.location_id !== Number(filterLocation.value)) return false
     return true
   })
 })
@@ -219,9 +214,14 @@ async function fetchDevices() {
   devices.value = data
 }
 
+async function fetchLocations() {
+  const { data } = await axios.get('/api/locations')
+  locations.value = data
+}
+
 async function addDevice() {
   await axios.post('/api/devices', form.value)
-  form.value = { name: '', device_type: 'computer', ipv4: '', mac: '', floor: '', location: '' }
+  form.value = { name: '', device_type: 'computer', ipv4: '', mac: '', location_id: null }
   document.getElementById('add_modal').close()
   fetchDevices()
 }
@@ -281,5 +281,8 @@ async function importArp() {
   importing.value = false
 }
 
-onMounted(fetchDevices)
+onMounted(() => {
+  fetchDevices()
+  fetchLocations()
+})
 </script>

@@ -6,7 +6,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy import text as sql_text
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from . import crud, models, schemas
 from .database import Base, engine, get_db
@@ -27,6 +27,27 @@ async def lifespan(app: FastAPI):
             conn.commit()
         except Exception:
             pass
+        try:
+            conn.execute(sql_text("ALTER TABLE devices ADD COLUMN location_id INTEGER REFERENCES locations(id)"))
+            conn.commit()
+        except Exception:
+            pass
+    with Session(engine) as session:
+        existing = session.query(models.Location).count()
+        if existing == 0:
+            rows = session.execute(
+                sql_text("SELECT DISTINCT floor, location FROM devices WHERE location IS NOT NULL")
+            ).all()
+            for floor, location in rows:
+                session.add(models.Location(name=location, floor=floor))
+            session.commit()
+            for device in session.query(models.Device).filter(models.Device.location.isnot(None)):
+                loc = session.query(models.Location).filter_by(
+                    name=device.location, floor=device.floor
+                ).first()
+                if loc:
+                    device.location_id = loc.id
+            session.commit()
     yield
 
 
@@ -46,16 +67,20 @@ def list_devices(
     skip: int = 0,
     limit: int = 100,
     type: Optional[str] = Query(None),
-    location: Optional[str] = Query(None),
+    location_id: Optional[int] = Query(None),
     db: Session = Depends(get_db),
 ):
-    query = db.query(models.Device)
+    query = db.query(models.Device).options(
+        joinedload(models.Device.location_ref)
+    )
     if type:
         query = query.filter(models.Device.device_type == type)
-    if location:
-        query = query.filter(models.Device.location == location)
+    if location_id:
+        query = query.filter(models.Device.location_id == location_id)
     devices = query.offset(skip).limit(limit).all()
     for d in devices:
+        d.location_name = d.location_ref.name if d.location_ref else None
+        d.location_floor = d.location_ref.floor if d.location_ref else None
         for p in d.ports:
             if p.connected_device:
                 p.connected_device_name = p.connected_device.name
@@ -67,6 +92,8 @@ def get_device(device_id: int, db: Session = Depends(get_db)):
     device = crud.get_device(db, device_id)
     if not device:
         raise HTTPException(status_code=404, detail="Device not found")
+    device.location_name = device.location_ref.name if device.location_ref else None
+    device.location_floor = device.location_ref.floor if device.location_ref else None
     for p in device.ports:
         if p.connected_device:
             p.connected_device_name = p.connected_device.name
@@ -80,7 +107,10 @@ def create_device(device: schemas.DeviceCreate, db: Session = Depends(get_db)):
     ).first()
     if existing:
         raise HTTPException(status_code=400, detail="Device name already exists")
-    return crud.create_device(db, device)
+    db_device = crud.create_device(db, device)
+    db_device.location_name = db_device.location_ref.name if db_device.location_ref else None
+    db_device.location_floor = db_device.location_ref.floor if db_device.location_ref else None
+    return db_device
 
 
 @app.put("/api/devices/{device_id}", response_model=schemas.DeviceResponse)
@@ -90,6 +120,8 @@ def update_device(
     updated = crud.update_device(db, device_id, device)
     if not updated:
         raise HTTPException(status_code=404, detail="Device not found")
+    updated.location_name = updated.location_ref.name if updated.location_ref else None
+    updated.location_floor = updated.location_ref.floor if updated.location_ref else None
     return updated
 
 
@@ -179,6 +211,30 @@ def delete_connection(conn_id: int, db: Session = Depends(get_db)):
     return {"ok": True}
 
 
+@app.get("/api/locations", response_model=list[schemas.LocationResponse])
+def list_locations(db: Session = Depends(get_db)):
+    return crud.get_locations(db)
+
+
+@app.post("/api/locations", response_model=schemas.LocationResponse)
+def create_location(loc: schemas.LocationCreate, db: Session = Depends(get_db)):
+    existing = db.query(models.Location).filter(
+        models.Location.name == loc.name,
+        models.Location.floor == loc.floor,
+    ).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Location already exists")
+    return crud.create_location(db, loc)
+
+
+@app.delete("/api/locations/{loc_id}")
+def delete_location(loc_id: int, db: Session = Depends(get_db)):
+    deleted = crud.delete_location(db, loc_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Location not found")
+    return {"ok": True}
+
+
 @app.get("/api/networks", response_model=list[schemas.NetworkResponse])
 def list_networks(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     return crud.get_networks(db, skip, limit)
@@ -264,6 +320,8 @@ def enrich_device(device_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Device not found")
     updated = do_enrich(db, device)
     db.refresh(device)
+    device.location_name = device.location_ref.name if device.location_ref else None
+    device.location_floor = device.location_ref.floor if device.location_ref else None
     for p in device.ports:
         if p.connected_device:
             p.connected_device_name = p.connected_device.name
