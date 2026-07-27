@@ -167,7 +167,7 @@ def delete_network(db: Session, network_id: int):
 # --- Locations ---
 
 def get_locations(db: Session):
-    return db.query(models.Location).all()
+    return db.query(models.Location).order_by(models.Location.name).all()
 
 
 def create_location(db: Session, loc: schemas.LocationCreate):
