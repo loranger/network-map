@@ -139,6 +139,8 @@ function buildGraph(data) {
           'font-size': '12px',
           'text-valign': 'center',
           'text-halign': 'center',
+          'min-width': 'label',
+          'min-height': 'label',
           padding: '10px',
           shape: 'round-rectangle',
         },
@@ -203,6 +205,13 @@ function buildGraph(data) {
   layout.one('layoutstop', () => {
     cy.fit(undefined, 50)
     cy.center()
+
+    cy.on('mouseover', 'node:childless', () => {
+      cy.container().style.cursor = 'pointer'
+    })
+    cy.on('mouseout', 'node:childless', () => {
+      cy.container().style.cursor = 'default'
+    })
 
     cy.on('dblclick', 'node:childless', (evt) => {
       const nodeId = evt.target.id()
