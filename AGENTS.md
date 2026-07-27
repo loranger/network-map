@@ -17,7 +17,9 @@ network-map/
 │       ├── models.py        # Modèles SQLAlchemy (Device, SwitchPort, Connection, Network)
 │       ├── schemas.py       # Schémas Pydantic (validation sérialisation)
 │       ├── crud.py          # Opérations CRUD + construction du graphe
-│       └── scanner.py       # Scan ARP réseau
+│       ├── scanner.py       # Scan ARP réseau
+│       └── enricher.py      # Lookup OUI fabricant + reverse DNS
+├── scan-host.sh       # Script macOS : importe arp -a dans l'API
 ├── frontend/          # Interface web Vue 3
 │   ├── Dockerfile
 │   ├── nginx.conf
@@ -31,9 +33,9 @@ network-map/
 │       ├── App.vue          # Layout principal (drawer sidebar responsive)
 │       ├── style.css        # Tailwind + styles graph-container
 │       └── views/
-│           ├── Devices.vue      # Liste CRUD + scan réseau
-│           ├── DeviceDetail.vue # Détail, ports switch, connexions
-│           ├── Graph.vue        # Cartographie vis-network
+│           ├── Devices.vue      # Liste CRUD + scan réseau + import ARP + enrichissement
+│           ├── DeviceDetail.vue # Détail, ports switch (triés, nuancier couleur), connexions, enrich unitaire
+│           ├── Graph.vue        # Cartographie Cytoscape.js (compound nodes + fcose layout)
 │           └── Networks.vue     # Gestion réseaux
 ├── devices.yaml       # Données initiales (périphériques) — conservé comme référence
 ├── networks.yaml      # Données initiales (réseaux) — conservé comme référence
@@ -53,7 +55,7 @@ network-map/
 | Frontend | Vue 3 (Composition API) | 3.5 |
 | Routage | Vue Router 4 (hash history) | 4.5 |
 | HTTP client | Axios | 1.7 |
-| Graphique | vis-network + vis-data | 9.1 / 7.1 |
+| Graphique | Cytoscape.js + cytoscape-fcose | 3.31 / 2.2 |
 | Icônes | SVG inline (Lucide-compatible) | — |
 | CSS | Tailwind CSS 3 + daisyUI 4 | 3.4 / 4.12 |
 | Build | Vite | 6.0 |
@@ -75,6 +77,8 @@ Stocké dans la table `devices`. Représente tout périphérique réseau.
 | mac | String? | Adresse MAC |
 | ipv4 | String? | Adresse IPv4 |
 | ipv6 | String? | Adresse IPv6 |
+| hostname | String? | Nom DNS court |
+| ip_type | String? | static / dhcp |
 | location | String? | Emplacement physique |
 | notes | Text? | Notes libres |
 | discovered | Boolean | Vrai si trouvé par scan automatique |
@@ -108,6 +112,7 @@ Stocké dans la table `connections`. Lien entre deux périphériques.
 | type | String | wired / wireless |
 | technology | String? | Ethernet, WiFi, etc. |
 | speed | String? | 1GbE, 2.4GHz, 5GHz |
+| color | String? | Couleur de câble (hex) |
 | notes | Text? | Notes |
 
 ### Network
@@ -158,11 +163,13 @@ Toutes les routes sont préfixées par `/api`.
 |---|---|---|
 | POST | /api/scan | Scan ARP (nmap ARP ping + arp -a) |
 | POST | /api/scan/import | Importer output de `arp -a` depuis l'hôte |
+| POST | /api/enrich | Enrichir tous les devices (OUI fabricant + reverse DNS) |
+| POST | /api/enrich/{id} | Enrichir un device spécifique |
 | GET | /api/graph | Données du graphe (noeuds + arêtes) |
 
 ## Graphique (cartographie)
 
-Utilise `vis-network` avec le solver physique `forceAtlas2Based`. Les flèches directionnelles sont activées sur toutes les arêtes. Le code couleur par type de périphérique est défini dans `crud.py` et `Graph.vue` :
+Utilise `Cytoscape.js` avec le layout `fcose`. Les noeuds sont regroupés en **compound nodes** par emplacement physique. Les arêtes utilisent le style `unbundled-bezier` avec une courbure alternée (±25px) pour un rendu organique. Les flèches directionnelles sont activées sur toutes les arêtes. Le code couleur par type de périphérique est défini dans `crud.py` et `Graph.vue` :
 
 | Type | Couleur |
 |---|---|
@@ -175,7 +182,24 @@ Utilise `vis-network` avec le solver physique `forceAtlas2Based`. Les flèches d
 | iot | Rose (#ec4899) |
 | other | Gris (#6b7280) |
 
-Les connexions sans fil (`type: "wireless"`) sont affichées en pointillés. Les arêtes sont courbées (`curvedCW`) avec un label indiquant la technologie.
+Les connexions sans fil (`dashes: true`) sont affichées en pointillés via la classe CSS `edge.wireless`.
+
+**Bug connu contourné** : avec les compound nodes, passer les éléments et le layout au constructeur Cytoscape fait disparaître les arêtes au rendu initial. Solution : créer l'instance vide, ajouter les éléments via `cy.add()`, puis lancer `layout.run()` séparément.
+
+### Paramètres du layout fcose
+
+| Paramètre | Valeur |
+|---|---|
+| nodeRepulsion | 4500 |
+| idealEdgeLength | 100 |
+| edgeElasticity | 0.45 |
+| nestingFactor | 1.8 |
+| gravity | 0.25 |
+| gravityCompound | 1.5 |
+| gravityRangeCompound | 1.5 |
+| numIter | 2500 |
+| tile | true |
+| packComponents | true |
 
 ## Scan réseau
 
@@ -192,6 +216,14 @@ bash scan-host.sh
 ```
 
 Ce script envoie le output de `arp -a` du Mac à `POST /api/scan/import` qui crée/met à jour les devices dans la base.
+
+## Enrichissement
+
+L'enrichissement (`POST /api/enrich` ou `POST /api/enrich/{id}`) combine :
+1. **Lookup OUI** : environ 50 préfixes MAC connus pour identifier le fabricant
+2. **Reverse DNS** : résolution PTR de l'adresse IPv4
+
+Si un hostname est trouvé par reverse DNS **et** que le nom du device commence par `device-`, le nom est automatiquement remplacé par le hostname court (partie avant le premier point).
 
 ## Déploiement
 
@@ -234,7 +266,7 @@ Pour que nmap donne les vrais périphériques du LAN, le backend doit partager l
 
 - Python 3.13+ requis (le scan ARP et SQLAlchemy nécessitent la version système)
 - Node 26+ pour le build frontend
-- Le fichier de base de données SQLite est stocké dans un volume Docker (`network-map-data:/app/data`)
+- Le fichier de base de données SQLite est stocké dans un bind mount (`./datas:/app/data`)
 - Les fichiers `devices.yaml` et `networks.yaml` sont conservés comme traces historiques mais ne sont plus utilisés par l'application
 - Pas de système d'authentification (usage local / LAN uniquement)
 - Le frontend utilise un hash router (`createWebHashHistory`) pour fonctionner sans configuration serveur avancée
@@ -247,7 +279,7 @@ Avant de modifier ou d'étendre ce projet, consulter sur Context7 les documentat
 - **Vue 3** — Composition API, réactivité, slots, téléport
 - **Tailwind CSS 3** — classes utilitaires, configuration custom
 - **daisyUI 4** — composants, thèmes, personnalisation
-- **vis-network** — options de physique, layout hiérarchique, events
+- **Cytoscape.js** — compound nodes, layouts, style, events
 - **SQLAlchemy 2.0** — déclarative mapping, relationships, queries
 - **Docker Compose** — networking, volumes, healthchecks
 - **Nginx** — reverse proxy, configuration SPA
