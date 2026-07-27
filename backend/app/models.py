@@ -18,6 +18,7 @@ class Device(Base):
     mac = Column(String, nullable=True)
     ipv4 = Column(String, nullable=True)
     ipv6 = Column(String, nullable=True)
+    floor = Column(String, nullable=True)
     location = Column(String, nullable=True)
     notes = Column(Text, nullable=True)
     discovered = Column(Boolean, default=False)

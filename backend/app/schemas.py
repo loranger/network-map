@@ -35,6 +35,7 @@ class DeviceBase(BaseModel):
     ipv4: Optional[str] = None
     ipv6: Optional[str] = None
     location: Optional[str] = None
+    floor: Optional[str] = None
     notes: Optional[str] = None
 
 
@@ -52,6 +53,7 @@ class DeviceUpdate(BaseModel):
     mac: Optional[str] = None
     ipv4: Optional[str] = None
     ipv6: Optional[str] = None
+    floor: Optional[str] = None
     location: Optional[str] = None
     notes: Optional[str] = None
 

@@ -79,6 +79,7 @@ Stocké dans la table `devices`. Représente tout périphérique réseau.
 | ipv6 | String? | Adresse IPv6 |
 | hostname | String? | Nom DNS court |
 | ip_type | String? | static / dhcp |
+| floor | String? | Étage (RDC, 1er, etc.) |
 | location | String? | Emplacement physique |
 | notes | Text? | Notes libres |
 | discovered | Boolean | Vrai si trouvé par scan automatique |
@@ -169,7 +170,7 @@ Toutes les routes sont préfixées par `/api`.
 
 ## Graphique (cartographie)
 
-Utilise `Cytoscape.js` avec le layout `fcose`. Les noeuds sont regroupés en **compound nodes** par emplacement physique. Les arêtes utilisent le style `unbundled-bezier` avec une courbure alternée (±25px) pour un rendu organique. Les flèches directionnelles sont activées sur toutes les arêtes. Le code couleur par type de périphérique est défini dans `crud.py` et `Graph.vue` :
+Utilise `Cytoscape.js` avec le layout `fcose`. Les noeuds sont regroupés en **compound nodes** hiérarchiques : Étage > Emplacement > Périphérique (3 niveaux). Les arêtes utilisent le style `unbundled-bezier` avec une courbure alternée (±25px) pour un rendu organique. Les flèches directionnelles sont activées sur toutes les arêtes. Le code couleur par type de périphérique est défini dans `crud.py` et `Graph.vue` :
 
 | Type | Couleur |
 |---|---|

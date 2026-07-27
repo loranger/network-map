@@ -54,6 +54,7 @@
             <th class="hidden lg:table-cell">MAC</th>
             <th class="hidden xl:table-cell">Fabricant</th>
             <th>Emplacement</th>
+            <th class="hidden xl:table-cell">Étage</th>
             <th class="hidden md:table-cell">Découvert</th>
             <th></th>
           </tr>
@@ -75,6 +76,7 @@
             <td class="hidden lg:table-cell font-mono text-sm">{{ d.mac || '-' }}</td>
             <td class="hidden xl:table-cell text-sm">{{ d.manufacturer || '-' }}</td>
             <td>{{ capitalize(d.location) || '-' }}</td>
+            <td class="hidden xl:table-cell">{{ capitalize(d.floor) || '-' }}</td>
             <td class="hidden md:table-cell">
               <span v-if="d.discovered" class="text-success">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
@@ -153,6 +155,10 @@
             <input v-model="form.mac" class="input input-bordered" placeholder="XX:XX:XX:XX:XX:XX" />
           </div>
           <div class="form-control mb-3">
+            <label class="label"><span class="label-text">Étage</span></label>
+            <input v-model="form.floor" class="input input-bordered" placeholder="ex: RDC, 1er..." />
+          </div>
+          <div class="form-control mb-3">
             <label class="label"><span class="label-text">Emplacement</span></label>
             <input v-model="form.location" class="input input-bordered" placeholder="ex: garage, bureau..." />
           </div>
@@ -178,7 +184,7 @@ const scanning = ref(false)
 const enriching = ref(false)
 
 const form = ref({
-  name: '', device_type: 'computer', ipv4: '', mac: '', location: '',
+  name: '', device_type: 'computer', ipv4: '', mac: '', floor: '', location: '',
 })
 
 const locations = computed(() => {
@@ -215,7 +221,7 @@ async function fetchDevices() {
 
 async function addDevice() {
   await axios.post('/api/devices', form.value)
-  form.value = { name: '', device_type: 'computer', ipv4: '', mac: '', location: '' }
+  form.value = { name: '', device_type: 'computer', ipv4: '', mac: '', floor: '', location: '' }
   document.getElementById('add_modal').close()
   fetchDevices()
 }

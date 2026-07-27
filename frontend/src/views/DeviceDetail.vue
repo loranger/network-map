@@ -47,6 +47,10 @@
                 <p class="font-mono">{{ device.ipv6 || '-' }}</p>
               </div>
               <div>
+                <label class="text-sm opacity-60">Étage</label>
+                <p>{{ capitalize(device.floor) || '-' }}</p>
+              </div>
+              <div>
                 <label class="text-sm opacity-60">Emplacement</label>
                 <p>{{ capitalize(device.location) || '-' }}</p>
               </div>
@@ -178,6 +182,10 @@
           <div class="form-control mb-3">
             <label class="label"><span class="label-text">Emplacement</span></label>
             <input v-model="editForm.location" class="input input-bordered" />
+          </div>
+          <div class="form-control mb-3">
+            <label class="label"><span class="label-text">Étage</span></label>
+            <input v-model="editForm.floor" class="input input-bordered" placeholder="ex: RDC, 1er..." />
           </div>
           <div class="form-control mb-3">
             <label class="label"><span class="label-text">Notes</span></label>

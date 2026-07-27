@@ -16,7 +16,7 @@ from .database import Base, engine, get_db
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
     with engine.connect() as conn:
-        for col in ["hostname", "ip_type"]:
+        for col in ["hostname", "ip_type", "floor"]:
             try:
                 conn.execute(sql_text(f"ALTER TABLE devices ADD COLUMN {col} VARCHAR"))
                 conn.commit()

@@ -46,12 +46,18 @@ const locationColorPalette = [
   '#0ea5e9', '#3b82f6',
 ]
 
+const floorColorPalette = [
+  '#334155', '#475569', '#64748b',
+]
+
 function buildGraph(data) {
   const container = document.getElementById('graph-container')
 
+  const floorSet = new Set()
   const locIndex = {}
   let idx = 0
   for (const n of data.nodes) {
+    if (n.floor) floorSet.add(n.floor)
     if (n.location && !(n.location in locIndex)) {
       locIndex[n.location] = idx++
     }
@@ -62,27 +68,53 @@ function buildGraph(data) {
     locColors[loc] = locationColorPalette[locIndex[loc] % locationColorPalette.length]
   }
 
+  const floors = [...floorSet].sort()
+  const floorColors = {}
+  floors.forEach((f, i) => {
+    floorColors[f] = floorColorPalette[i % floorColorPalette.length]
+  })
+
   const elements = []
 
+  for (const floor of floors) {
+    elements.push({
+      data: {
+        id: `floor-${floor}`,
+        label: `Étage ${floor}`,
+        color: floorColors[floor],
+      },
+      classes: 'floor',
+    })
+  }
+
   for (const loc of Object.keys(locIndex)) {
+    const sample = data.nodes.find(n => n.location === loc)
+    const parentFloor = sample?.floor ? `floor-${sample.floor}` : undefined
     const color = locColors[loc]
     elements.push({
       data: {
         id: `loc-${loc}`,
         label: loc,
         color: color,
+        parent: parentFloor,
       },
       classes: 'location',
     })
   }
 
   for (const n of data.nodes) {
+    let parent = undefined
+    if (n.location) {
+      parent = `loc-${n.location}`
+    } else if (n.floor) {
+      parent = `floor-${n.floor}`
+    }
     elements.push({
       data: {
         id: `dev-${n.id}`,
         label: n.label,
         type: n.group || 'other',
-        parent: n.location ? `loc-${n.location}` : undefined,
+        parent: parent,
       },
     })
   }
@@ -104,6 +136,27 @@ function buildGraph(data) {
   cy = cytoscape({
     container,
     style: [
+      {
+        selector: 'node.floor',
+        style: {
+          label: 'data(label)',
+          'background-color': 'data(color)',
+          'background-opacity': 0.08,
+          'border-color': 'data(color)',
+          'border-width': 1,
+          'border-style': 'dashed',
+          'text-valign': 'top',
+          'text-halign': 'center',
+          'font-weight': 'bold',
+          'font-size': '14px',
+          color: 'data(color)',
+          'padding': '40px',
+          'shape': 'round-rectangle',
+          'compound-sizing-wrt-labels': 'include',
+          'min-width': '120px',
+          'min-height': '80px',
+        },
+      },
       {
         selector: 'node.location',
         style: {
