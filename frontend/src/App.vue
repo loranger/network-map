@@ -47,7 +47,7 @@
           </li>
           <li>
             <router-link to="/device-types" class="flex items-center gap-3">
-              <Palette :size="20" :stroke-width="2" />
+              <Shapes :size="20" :stroke-width="2" />
               Types
             </router-link>
           </li>
@@ -58,5 +58,5 @@
 </template>
 
 <script setup>
-import { Menu, Monitor, Network, Wifi, MapPin, Palette } from '@lucide/vue'
+import { Menu, Monitor, Network, Wifi, MapPin, Shapes } from '@lucide/vue'
 </script>
