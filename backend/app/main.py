@@ -256,6 +256,14 @@ def delete_location(loc_id: int, db: Session = Depends(get_db)):
     return {"ok": True}
 
 
+@app.put("/api/locations/{loc_id}", response_model=schemas.LocationResponse)
+def update_location(loc_id: int, loc: schemas.LocationUpdate, db: Session = Depends(get_db)):
+    updated = crud.update_location(db, loc_id, loc)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Location not found")
+    return updated
+
+
 @app.get("/api/networks", response_model=list[schemas.NetworkResponse])
 def list_networks(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     return crud.get_networks(db, skip, limit)

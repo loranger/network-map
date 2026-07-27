@@ -33,6 +33,11 @@ class LocationCreate(LocationBase):
     pass
 
 
+class LocationUpdate(BaseModel):
+    name: Optional[str] = None
+    floor: Optional[str] = None
+
+
 class LocationResponse(LocationBase):
     id: int
     created_at: datetime

@@ -186,6 +186,16 @@ def delete_location(db: Session, loc_id: int):
     return db_loc
 
 
+def update_location(db: Session, loc_id: int, loc: schemas.LocationUpdate):
+    db_loc = db.query(models.Location).filter(models.Location.id == loc_id).first()
+    if db_loc:
+        for key, value in loc.model_dump(exclude_unset=True).items():
+            setattr(db_loc, key, value)
+        db.commit()
+        db.refresh(db_loc)
+    return db_loc
+
+
 # --- Graph ---
 
 def get_graph_data(db: Session) -> schemas.GraphData:

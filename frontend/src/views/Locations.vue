@@ -14,6 +14,9 @@
           <h2 class="card-title">{{ capitalize(loc.name) }}</h2>
           <div class="text-sm opacity-60">Étage : {{ loc.floor || '-' }}</div>
           <div class="card-actions justify-end mt-2">
+            <button class="btn btn-ghost btn-xs" @click="openEdit(loc)">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            </button>
             <button class="btn btn-ghost btn-xs" @click="deleteLocation(loc.id)">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
             </button>
@@ -48,6 +51,26 @@
         </form>
       </div>
     </dialog>
+
+    <dialog id="edit_loc_modal" class="modal">
+      <div class="modal-box">
+        <h3 class="text-lg font-bold mb-4">Modifier l'emplacement</h3>
+        <form @submit.prevent="updateLocation">
+          <div class="form-control mb-3">
+            <label class="label"><span class="label-text">Nom</span></label>
+            <input v-model="editForm.name" class="input input-bordered" required />
+          </div>
+          <div class="form-control mb-3">
+            <label class="label"><span class="label-text">Étage</span></label>
+            <input v-model="editForm.floor" class="input input-bordered" placeholder="ex: RDC, 1er..." />
+          </div>
+          <div class="modal-action">
+            <button type="button" class="btn" onclick="edit_loc_modal.close()">Annuler</button>
+            <button type="submit" class="btn btn-primary">Enregistrer</button>
+          </div>
+        </form>
+      </div>
+    </dialog>
   </div>
 </template>
 
@@ -57,6 +80,7 @@ import axios from 'axios'
 
 const locations = ref([])
 const form = ref({ name: '', floor: '' })
+const editForm = ref({ name: '', floor: '' })
 
 function capitalize(s) {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''
@@ -71,6 +95,20 @@ async function addLocation() {
   await axios.post('/api/locations', form.value)
   form.value = { name: '', floor: '' }
   document.getElementById('loc_modal').close()
+  fetchLocations()
+}
+
+function openEdit(loc) {
+  editForm.value = { id: loc.id, name: loc.name, floor: loc.floor }
+  document.getElementById('edit_loc_modal').showModal()
+}
+
+async function updateLocation() {
+  await axios.put(`/api/locations/${editForm.value.id}`, {
+    name: editForm.value.name,
+    floor: editForm.value.floor,
+  })
+  document.getElementById('edit_loc_modal').close()
   fetchLocations()
 }
 
