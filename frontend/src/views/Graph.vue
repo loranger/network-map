@@ -139,11 +139,8 @@ function buildGraph(data) {
           'font-size': '12px',
           'text-valign': 'center',
           'text-halign': 'center',
-          width: 'label',
-          height: 'label',
-          padding: '8px',
+          padding: '10px',
           shape: 'round-rectangle',
-          'cursor': 'pointer',
         },
       },
       {
@@ -203,7 +200,7 @@ function buildGraph(data) {
     packComponents: true,
   })
 
-  layout.run().then(() => {
+  layout.one('layoutstop', () => {
     cy.fit(undefined, 50)
     cy.center()
 
@@ -213,6 +210,8 @@ function buildGraph(data) {
       router.push(`/devices/${deviceId}`)
     })
   })
+
+  layout.run()
 }
 
 async function refreshGraph() {
