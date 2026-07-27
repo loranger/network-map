@@ -199,7 +199,7 @@ def update_location(db: Session, loc_id: int, loc: schemas.LocationUpdate):
 # --- Device Types ---
 
 def get_device_types(db: Session):
-    return db.query(models.DeviceType).all()
+    return db.query(models.DeviceType).order_by(models.DeviceType.label).all()
 
 
 def create_device_type(db: Session, dt: schemas.DeviceTypeCreate):
