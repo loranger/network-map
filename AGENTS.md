@@ -14,7 +14,7 @@ network-map/
 │   └── app/
 │       ├── main.py          # Points d'entrée FastAPI + routes
 │       ├── database.py      # Connexion SQLite + session
-│       ├── models.py        # Modèles SQLAlchemy (Device, SwitchPort, Connection, Network)
+│       ├── models.py        # Modèles SQLAlchemy (Device, SwitchPort, Connection, Network, Location, DeviceType)
 │       ├── schemas.py       # Schémas Pydantic (validation sérialisation)
 │       ├── crud.py          # Opérations CRUD + construction du graphe
 │       ├── scanner.py       # Scan ARP réseau
@@ -33,10 +33,12 @@ network-map/
 │       ├── App.vue          # Layout principal (drawer sidebar responsive)
 │       ├── style.css        # Tailwind + styles graph-container
 │       └── views/
-│           ├── Devices.vue      # Liste CRUD + scan réseau + import ARP + enrichissement
+│           ├── Devices.vue      # Liste CRUD + scan réseau + import ARP + enrichissement + tri colonnes
 │           ├── DeviceDetail.vue # Détail, ports switch (triés, nuancier couleur), connexions, enrich unitaire
-│           ├── Graph.vue        # Cartographie Cytoscape.js (compound nodes + fcose layout)
-│           └── Networks.vue     # Gestion réseaux
+│           ├── Graph.vue        # Cartographie Cytoscape.js (compound nodes 3 niveaux + fcose + légende interactive + anti-overlap)
+│           ├── Networks.vue     # Gestion réseaux (CRUD + édition)
+│           ├── Locations.vue    # Gestion emplacements (CRUD)
+│           └── DeviceTypes.vue  # Gestion types (CRUD, couleur aléatoire sombre)
 ├── devices.yaml       # Données initiales (périphériques) — conservé comme référence
 ├── networks.yaml      # Données initiales (réseaux) — conservé comme référence
 ├── docker-compose.yml # Orchestration complète
@@ -51,12 +53,13 @@ network-map/
 | Backend API | Python 3.13 + FastAPI | 0.115 |
 | Validation | Pydantic | 2.10 |
 | Serveur ASGI | Uvicorn | 0.34 |
-| Scan réseau | ARP via subprocess (net-tools) | — |
+| Scan réseau | nmap + arp via subprocess | — |
 | Frontend | Vue 3 (Composition API) | 3.5 |
 | Routage | Vue Router 4 (hash history) | 4.5 |
 | HTTP client | Axios | 1.7 |
 | Graphique | Cytoscape.js + cytoscape-fcose | 3.31 / 2.2 |
-| Icônes | SVG inline (Lucide-compatible) | — |
+| Icônes | @lucide/vue | — |
+| Upload | python-multipart | — |
 | CSS | Tailwind CSS 3 + daisyUI 4 | 3.4 / 4.12 |
 | Build | Vite | 6.0 |
 | Conteneurisation | Docker + Docker Compose | — |
@@ -70,7 +73,7 @@ Stocké dans la table `devices`. Représente tout périphérique réseau.
 | Champ | Type | Notes |
 |---|---|---|
 | id | Integer PK | Auto-incrément |
-| name | String (unique) | Nom du périphérique |
+| name | String | Nom du périphérique |
 | device_type | String | Enum: computer, iot, switch, ap, router, modem, server, other |
 | manufacturer | String? | Fabricant |
 | model | String? | Modèle |
@@ -79,9 +82,6 @@ Stocké dans la table `devices`. Représente tout périphérique réseau.
 | ipv6 | String? | Adresse IPv6 |
 | hostname | String? | Nom DNS court |
 | ip_type | String? | static / dhcp |
-| mac | String? | Adresse MAC |
-| ipv4 | String? | Adresse IPv4 |
-| ipv6 | String? | Adresse IPv6 |
 | location_id | Integer FK? | Référence vers locations.id |
 | notes | Text? | Notes libres |
 | discovered | Boolean | Vrai si trouvé par scan automatique |
@@ -145,6 +145,18 @@ Relations : `devices` (Device)
 
 Le champ `location_id` (FK → locations.id) est présent sur `Device`. La hiérarchie dans le graphe est : Étage (floor) > Emplacement (location) > Périphérique (device).
 
+### DeviceType
+Stocké dans la table `device_types`. Type de périphérique avec libellé et couleur.
+
+| Champ | Type | Notes |
+|---|---|---|
+| id | Integer PK | Auto-incrément |
+| type | String | Identifiant technique (ex: router, switch) |
+| label | String | Libellé affiché (ex: Routeur, Switch) |
+| color | String | Couleur hex (ex: #3b82f6) |
+
+Les types sont seedés au démarrage avec les couleurs d'origine. Les couleurs ne sont plus hardcodées nulle part — elles viennent de la DB via l'API. Ajout d'un nouveau type via l'UI génère une couleur aléatoire sombre (HSL, luminance 25–50%).
+
 ## API REST
 
 Toutes les routes sont préfixées par `/api`.
@@ -166,6 +178,7 @@ Toutes les routes sont préfixées par `/api`.
 |---|---|---|
 | GET | /api/connections | Liste |
 | POST | /api/connections | Création |
+| PUT | /api/connections/{id} | Modification (couleur) |
 | DELETE | /api/connections/{id} | Suppression |
 
 ### Networks
@@ -173,6 +186,7 @@ Toutes les routes sont préfixées par `/api`.
 |---|---|---|
 | GET | /api/networks | Liste |
 | POST | /api/networks | Création |
+| PUT | /api/networks/{id} | Modification |
 | DELETE | /api/networks/{id} | Suppression |
 
 ### Locations
@@ -180,7 +194,16 @@ Toutes les routes sont préfixées par `/api`.
 |---|---|---|
 | GET | /api/locations | Liste |
 | POST | /api/locations | Création |
+| PUT | /api/locations/{id} | Modification |
 | DELETE | /api/locations/{id} | Suppression |
+
+### DeviceTypes
+| Méthode | Route | Description |
+|---|---|---|
+| GET | /api/device-types | Liste |
+| POST | /api/device-types | Création |
+| PUT | /api/device-types/{id} | Modification |
+| DELETE | /api/device-types/{id} | Suppression |
 
 ### Utilitaires
 | Méthode | Route | Description |
@@ -193,18 +216,7 @@ Toutes les routes sont préfixées par `/api`.
 
 ## Graphique (cartographie)
 
-Utilise `Cytoscape.js` avec le layout `fcose`. Les noeuds sont regroupés en **compound nodes** hiérarchiques : Étage > Emplacement > Périphérique (3 niveaux). Les arêtes utilisent le style `unbundled-bezier` avec une courbure alternée (±25px) pour un rendu organique. Les flèches directionnelles sont activées sur toutes les arêtes. Le code couleur par type de périphérique est défini dans `crud.py` et `Graph.vue` :
-
-| Type | Couleur |
-|---|---|
-| router | Bleu (#3b82f6) |
-| modem | Violet (#8b5cf6) |
-| ap | Cyan (#06b6d4) |
-| switch | Orange (#f59e0b) |
-| computer | Vert (#10b981) |
-| server | Rouge (#ef4444) |
-| iot | Rose (#ec4899) |
-| other | Gris (#6b7280) |
+Utilise `Cytoscape.js` avec le layout `fcose`. Les noeuds sont regroupés en **compound nodes** hiérarchiques : Étage > Emplacement > Périphérique (3 niveaux). Les arêtes utilisent le style `unbundled-bezier` avec une courbure alternée (±25px) pour un rendu organique. Les flèches directionnelles sont activées sur toutes les arêtes. Le code couleur par type de périphérique vient de la table `device_types` en DB via l'API.
 
 Les connexions sans fil (`dashes: true`) sont affichées en pointillés via la classe CSS `edge.wireless`.
 
@@ -214,13 +226,13 @@ Les connexions sans fil (`dashes: true`) sont affichées en pointillés via la c
 
 | Paramètre | Valeur |
 |---|---|
-| nodeRepulsion | 4500 |
-| idealEdgeLength | 100 |
+| nodeRepulsion | 8000 |
+| idealEdgeLength | 120 |
 | edgeElasticity | 0.45 |
-| nestingFactor | 1.8 |
+| nestingFactor | 1.5 |
 | gravity | 0.25 |
-| gravityCompound | 1.5 |
-| gravityRangeCompound | 1.5 |
+| gravityCompound | 2.0 |
+| gravityRangeCompound | 2.0 |
 | numIter | 2500 |
 | tile | true |
 | packComponents | true |
@@ -244,7 +256,7 @@ Ce script envoie le output de `arp -a` du Mac à `POST /api/scan/import` qui cr�
 ## Enrichissement
 
 L'enrichissement (`POST /api/enrich` ou `POST /api/enrich/{id}`) combine :
-1. **Lookup OUI** : environ 50 préfixes MAC connus pour identifier le fabricant
+1. **Lookup OUI** : ~80 préfixes MAC connus pour identifier le fabricant (clés normalisées sans `:`, insensibles à la casse)
 2. **Reverse DNS** : résolution PTR de l'adresse IPv4
 
 Si un hostname est trouvé par reverse DNS **et** que le nom du device commence par `device-`, le nom est automatiquement remplacé par le hostname court (partie avant le premier point).

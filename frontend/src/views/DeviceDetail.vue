@@ -377,12 +377,6 @@ async function updateConnColor(connId, color) {
   )
 }
 
-async function deleteConnection(id) {
-  if (!confirm('Supprimer cette connexion ?')) return
-  await axios.delete(`/api/connections/${id}`)
-  fetchData()
-}
-
 onMounted(fetchData)
 
 watch(() => route.params.id, (newId, oldId) => {

@@ -64,6 +64,9 @@ OUI_DB = {
     "FC:25:3F": "HP",
 }
 
+# Normalize keys: remove colons so they match lookup_oui() output
+OUI_DB = {k.replace(":", "").upper(): v for k, v in OUI_DB.items()}
+
 
 def lookup_oui(mac: str) -> Optional[str]:
     if not mac:

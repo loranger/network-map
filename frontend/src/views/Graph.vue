@@ -258,7 +258,6 @@ function buildGraph(data) {
     gravity: 0.25,
     gravityCompound: 2.0,
     gravityRangeCompound: 2.0,
-    numIter: 4000,
     numIter: 2500,
     tile: true,
     packComponents: true,
