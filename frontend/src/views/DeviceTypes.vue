@@ -2,7 +2,7 @@
   <div>
     <div class="flex items-center justify-between mb-6">
       <h1 class="text-2xl font-bold">Types de périphériques</h1>
-      <button class="btn btn-primary" onclick="dt_modal.showModal()">
+      <button class="btn btn-primary" @click="openAdd">
         <Plus :size="18" :stroke-width="2" />
         Ajouter
       </button>
@@ -100,8 +100,13 @@ function randomDarkColor() {
   return `hsl(${h}, ${s}%, ${l}%)`
 }
 
-const form = ref({ type: '', label: '', color: randomDarkColor() })
+const form = ref({ type: '', label: '', color: '#6b7280' })
 const editForm = ref({ label: '', color: '' })
+
+function openAdd() {
+  form.value = { type: '', label: '', color: randomDarkColor() }
+  document.getElementById('dt_modal').showModal()
+}
 
 async function fetchTypes() {
   const { data } = await axios.get('/api/device-types')
