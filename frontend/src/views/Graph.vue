@@ -158,11 +158,11 @@ function buildGraph(data) {
           'font-weight': 'bold',
           'font-size': '14px',
           color: 'data(color)',
-          'padding': '50px',
+          'padding': '40px',
           'shape': 'round-rectangle',
           'compound-sizing-wrt-labels': 'include',
-          'min-width': '150px',
-          'min-height': '100px',
+          'min-width': '120px',
+          'min-height': '80px',
         },
       },
       {
@@ -179,7 +179,7 @@ function buildGraph(data) {
           'font-weight': 'bold',
           'font-size': '13px',
           color: 'data(color)',
-          'padding': '24px',
+          'padding': '16px',
           'shape': 'round-rectangle',
           'compound-sizing-wrt-labels': 'include',
           'min-width': '120px',
@@ -341,16 +341,17 @@ function removeOverlaps() {
         const overlapY = Math.max(0, Math.min(bbA.y2, bbB.y2) - Math.max(bbA.y1, bbB.y1))
 
         if (overlapX > 0 && overlapY > 0) {
-          const dx = bbB.x - bbA.x
-          const dy = bbB.y - bbA.y
+          const cxA = (bbA.x1 + bbA.x2) / 2
+          const cyA = (bbA.y1 + bbA.y2) / 2
+          const cxB = (bbB.x1 + bbB.x2) / 2
+          const cyB = (bbB.y1 + bbB.y2) / 2
+          const dx = cxB - cxA, dy = cyB - cyA
           const dist = Math.sqrt(dx * dx + dy * dy)
           const gap = 20
           if (dist < 1) {
-            b.position({ x: bbB.x + 80, y: bbB.y })
+            b.position({ x: cxA + 100, y: cyA })
           } else {
-            const sx = (overlapX + gap) * (dx / dist)
-            const sy = (overlapY + gap) * (dy / dist)
-            b.position({ x: bbB.x + sx, y: bbB.y + sy })
+            b.position({ x: cxB + (overlapX + gap) * (dx / dist), y: cyB + (overlapY + gap) * (dy / dist) })
           }
           moved = true
         }
