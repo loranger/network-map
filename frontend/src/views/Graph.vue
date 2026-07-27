@@ -24,12 +24,14 @@
 
 <script setup>
 import { onMounted, onBeforeUnmount } from 'vue'
+import { useRouter } from 'vue-router'
 import cytoscape from 'cytoscape'
 import fcose from 'cytoscape-fcose'
 import axios from 'axios'
 
 cytoscape.use(fcose)
 
+const router = useRouter()
 let cy = null
 
 const typeColors = {
@@ -141,6 +143,7 @@ function buildGraph(data) {
           height: 'label',
           padding: '8px',
           shape: 'round-rectangle',
+          'cursor': 'pointer',
         },
       },
       {
@@ -203,6 +206,12 @@ function buildGraph(data) {
   layout.run().then(() => {
     cy.fit(undefined, 50)
     cy.center()
+
+    cy.on('dblclick', 'node:childless', (evt) => {
+      const nodeId = evt.target.id()
+      const deviceId = nodeId.replace('dev-', '')
+      router.push(`/device/${deviceId}`)
+    })
   })
 }
 
