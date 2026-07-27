@@ -5,7 +5,7 @@
         <ArrowLeft :size="20" :stroke-width="2" />
       </router-link>
       <h1 class="text-2xl font-bold">{{ capitalize(device.name) }}</h1>
-      <span class="badge badge-lg text-white border-0" :style="{ backgroundColor: typeColor(device.device_type) }">{{ capitalize(device.device_type) }}</span>
+      <span class="badge badge-lg text-white border-0" :style="{ backgroundColor: typeColor(device.device_type) }">{{ typeLabel(device.device_type) }}</span>
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -292,6 +292,11 @@ function capitalize(s) {
 function typeColor(type) {
   const found = deviceTypes.value.find(dt => dt.type === type)
   return found ? found.color : '#6b7280'
+}
+
+function typeLabel(type) {
+  const found = deviceTypes.value.find(dt => dt.type === type)
+  return found ? found.label : type
 }
 
 function navigateTo(id) {

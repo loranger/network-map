@@ -72,7 +72,7 @@
               <router-link :to="`/devices/${d.id}`" class="link link-hover">{{ capitalize(d.name) }}</router-link>
             </td>
             <td class="hidden md:table-cell">
-              <span class="badge text-white border-0" :style="{ backgroundColor: typeColor(d.device_type) }">{{ capitalize(d.device_type) }}</span>
+              <span class="badge text-white border-0" :style="{ backgroundColor: typeColor(d.device_type) }">{{ typeLabel(d.device_type) }}</span>
             </td>
             <td class="hidden sm:table-cell font-mono text-sm">{{ d.ipv4 || '-' }}</td>
             <td class="hidden sm:table-cell text-sm">
@@ -224,6 +224,11 @@ function capitalize(s) {
 function typeColor(type) {
   const found = deviceTypes.value.find(dt => dt.type === type)
   return found ? found.color : '#6b7280'
+}
+
+function typeLabel(type) {
+  const found = deviceTypes.value.find(dt => dt.type === type)
+  return found ? found.label : type
 }
 
 async function fetchDevices() {
