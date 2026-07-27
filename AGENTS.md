@@ -307,6 +307,18 @@ Pour que nmap donne les vrais périphériques du LAN, le backend doit partager l
 - Pas de système d'authentification (usage local / LAN uniquement)
 - Le frontend utilise un hash router (`createWebHashHistory`) pour fonctionner sans configuration serveur avancée
 
+## Qualité du code
+
+### Règles à vérifier systématiquement avant chaque commit
+
+1. **Pas de code mort** — toute fonction, variable ou import non utilisé(e) doit être supprimé(e). Vérifier avec `rg` les appels.
+2. **Pas de clés dupliquées** — dans les objets JS, dictionnaires Python, etc. La dernière écrase la première (silencieux).
+3. **Normalisation cohérente** — si une fonction normalise une valeur (`replace(":", "").upper()`), les données statiques doivent être normalisées au même format au moment de la définition.
+4. **Pas de valeurs hardcodées redondantes** — si une valeur existe en DB (couleurs des types, etc.), elle ne doit pas être dupliquée dans le code frontend ou backend.
+5. **Pas de `onclick=` dans les templates Vue** — toujours utiliser `@click` avec une fonction définie dans `<script setup>`. Le `onclick=` HTML crée des dépendances globales implicites et contourne Vue.
+6. **Pas de `document.getElementById().showModal()`** — utiliser les template refs Vue (`ref="modal"`, `modal.value.showModal()`).
+7. **Purger les `console.log` de debug** avant de proposer un commit.
+
 ## Bonnes pratiques pour l'IA
 
 Avant de modifier ou d'étendre ce projet, consulter sur Context7 les documentations les plus récentes des technologies utilisées :
