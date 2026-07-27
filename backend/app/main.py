@@ -64,21 +64,6 @@ async def lifespan(app: FastAPI):
                 if loc:
                     device.location_id = loc.id
             session.commit()
-        else:
-            dup_names = session.execute(
-                sql_text("SELECT name FROM locations GROUP BY name HAVING COUNT(*) > 1")
-            ).all()
-            for (name,) in dup_names:
-                duplicates = session.query(models.Location).filter(
-                    models.Location.name == name
-                ).order_by(models.Location.floor.is_(None)).all()
-                keep = duplicates[0]
-                for dup in duplicates[1:]:
-                    session.query(models.Device).filter(
-                        models.Device.location_id == dup.id
-                    ).update({"location_id": keep.id})
-                    session.delete(dup)
-            session.commit()
     yield
 
 
