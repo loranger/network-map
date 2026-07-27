@@ -138,6 +138,13 @@ def create_device(device: schemas.DeviceCreate, db: Session = Depends(get_db)):
 def update_device(
     device_id: int, device: schemas.DeviceUpdate, db: Session = Depends(get_db)
 ):
+    if device.name is not None:
+        existing = db.query(models.Device).filter(
+            models.Device.name == device.name,
+            models.Device.id != device_id,
+        ).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="Device name already exists")
     updated = crud.update_device(db, device_id, device)
     if not updated:
         raise HTTPException(status_code=404, detail="Device not found")
