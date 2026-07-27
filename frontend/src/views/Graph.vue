@@ -152,8 +152,7 @@ function buildGraph(data) {
           'target-arrow-color': (el) => el.data('color'),
           'target-arrow-shape': 'triangle',
           'arrow-scale': 1,
-          'curve-style': 'bezier',
-          'control-point-step-size': 40,
+          'curve-style': 'straight',
           label: (el) => el.data('label'),
           'font-size': '10px',
           color: '#94a3b8',
@@ -191,6 +190,11 @@ function buildGraph(data) {
     boxSelectionEnabled: false,
     autoungrabify: false,
     autounselectify: true,
+  })
+
+  cy.on('layoutstop', () => {
+    cy.fit(undefined, 50)
+    cy.center()
   })
 }
 
