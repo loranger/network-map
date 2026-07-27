@@ -101,7 +101,6 @@ function buildGraph(data) {
 
   cy = cytoscape({
     container,
-    elements,
     style: [
       {
         selector: 'node.location',
@@ -152,8 +151,7 @@ function buildGraph(data) {
           'target-arrow-color': (el) => el.data('color'),
           'target-arrow-shape': 'triangle',
           'arrow-scale': 1,
-          'curve-style': 'bezier',
-          'control-point-step-size': 40,
+          'curve-style': 'straight',
           label: (el) => el.data('label'),
           'font-size': '10px',
           color: '#94a3b8',
@@ -170,20 +168,6 @@ function buildGraph(data) {
         },
       },
     ],
-    layout: {
-      name: 'fcose',
-      animate: false,
-      nodeRepulsion: 4500,
-      idealEdgeLength: 100,
-      edgeElasticity: 0.45,
-      nestingFactor: 1.8,
-      gravity: 0.25,
-      gravityCompound: 1.5,
-      gravityRangeCompound: 1.5,
-      numIter: 2500,
-      tile: true,
-      packComponents: true,
-    },
     zoomingEnabled: true,
     userZoomingEnabled: true,
     panningEnabled: true,
@@ -193,7 +177,24 @@ function buildGraph(data) {
     autounselectify: true,
   })
 
-  cy.on('layoutstop', () => {
+  cy.add(elements)
+
+  const layout = cy.layout({
+    name: 'fcose',
+    animate: false,
+    nodeRepulsion: 4500,
+    idealEdgeLength: 100,
+    edgeElasticity: 0.45,
+    nestingFactor: 1.8,
+    gravity: 0.25,
+    gravityCompound: 1.5,
+    gravityRangeCompound: 1.5,
+    numIter: 2500,
+    tile: true,
+    packComponents: true,
+  })
+
+  layout.run().then(() => {
     cy.fit(undefined, 50)
     cy.center()
   })
