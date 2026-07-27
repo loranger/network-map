@@ -58,14 +58,17 @@ function buildGraph(data) {
   let idx = 0
   for (const n of data.nodes) {
     if (n.floor) floorSet.add(n.floor)
-    if (n.location && !(n.location in locIndex)) {
-      locIndex[n.location] = idx++
+    const locKey = n.location_id ? `loc-${n.location_id}` : null
+    if (n.location && locKey && !(locKey in locIndex)) {
+      locIndex[locKey] = { name: n.location, sample: n }
     }
   }
 
   const locColors = {}
-  for (const loc of Object.keys(locIndex)) {
-    locColors[loc] = locationColorPalette[locIndex[loc] % locationColorPalette.length]
+  for (const [key, val] of Object.entries(locIndex)) {
+    locColors[key] = locationColorPalette[
+      (Object.keys(locIndex).indexOf(key)) % locationColorPalette.length
+    ]
   }
 
   const floors = [...floorSet].sort()
@@ -87,14 +90,13 @@ function buildGraph(data) {
     })
   }
 
-  for (const loc of Object.keys(locIndex)) {
-    const sample = data.nodes.find(n => n.location === loc)
-    const parentFloor = sample?.floor ? `floor-${sample.floor}` : undefined
-    const color = locColors[loc]
+  for (const [locKey, val] of Object.entries(locIndex)) {
+    const parentFloor = val.sample?.floor ? `floor-${val.sample.floor}` : undefined
+    const color = locColors[locKey]
     elements.push({
       data: {
-        id: `loc-${loc}`,
-        label: loc,
+        id: locKey,
+        label: val.name,
         color: color,
         parent: parentFloor,
       },
@@ -104,8 +106,8 @@ function buildGraph(data) {
 
   for (const n of data.nodes) {
     let parent = undefined
-    if (n.location) {
-      parent = `loc-${n.location}`
+    if (n.location && n.location_id) {
+      parent = `loc-${n.location_id}`
     } else if (n.floor) {
       parent = `floor-${n.floor}`
     }

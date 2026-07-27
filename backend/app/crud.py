@@ -228,6 +228,7 @@ def get_graph_data(db: Session) -> schemas.GraphData:
             "group": d.device_type,
             "location": loc_name,
             "floor": loc_floor,
+            "location_id": d.location_id,
         })
 
     edges = []
