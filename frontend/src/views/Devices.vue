@@ -4,21 +4,21 @@
       <h1 class="text-2xl font-bold">Périphériques</h1>
       <div class="flex gap-2">
         <button class="btn btn-outline" @click="scanNetwork" :disabled="scanning">
-          <svg v-if="!scanning" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <Search v-if="!scanning" :size="18" :stroke-width="2" />
           <span v-else class="loading loading-spinner"></span>
           Scanner
         </button>
         <button class="btn btn-outline" onclick="import_arp_modal.showModal()">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <Download :size="18" :stroke-width="2" />
           Importer ARP
         </button>
         <button class="btn btn-outline" @click="enrichDevices" :disabled="enriching">
-          <svg v-if="!enriching" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          <Info v-if="!enriching" :size="18" :stroke-width="2" />
           <span v-else class="loading loading-spinner"></span>
           Enrichir
         </button>
         <button class="btn btn-primary" onclick="add_modal.showModal()">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <Plus :size="18" :stroke-width="2" />
           Ajouter
         </button>
       </div>
@@ -72,15 +72,15 @@
             <td class="hidden xl:table-cell">{{ capitalize(d.location_floor) || '-' }}</td>
             <td class="hidden md:table-cell">
               <span v-if="d.discovered" class="text-success">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                <Check :size="16" :stroke-width="2" />
               </span>
               <span v-else class="text-warning">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                <X :size="16" :stroke-width="2" />
               </span>
             </td>
             <td>
               <button class="btn btn-ghost btn-xs" @click="deleteDevice(d.id)">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                <Trash2 :size="16" :stroke-width="2" />
               </button>
             </td>
           </tr>
@@ -160,6 +160,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import axios from 'axios'
+import { Search, Download, Info, Plus, Trash2, Check, X } from 'lucide-vue-next'
 
 const devices = ref([])
 const locations = ref([])

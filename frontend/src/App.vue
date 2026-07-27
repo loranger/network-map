@@ -5,7 +5,7 @@
       <div class="navbar bg-base-200 border-b border-base-300 lg:hidden">
         <div class="flex-none">
           <label for="drawer-toggle" class="btn btn-square btn-ghost">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="inline-block w-6 h-6 stroke-current"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+            <Menu :size="24" :stroke-width="2" />
           </label>
         </div>
         <div class="flex-1">
@@ -23,31 +23,31 @@
         <ul class="menu menu-md gap-1">
           <li>
             <router-link to="/devices" class="flex items-center gap-3">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+              <Monitor :size="20" :stroke-width="2" />
               Périphériques
             </router-link>
           </li>
           <li>
             <router-link to="/graph" class="flex items-center gap-3">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="5" r="2"/><circle cx="19" cy="12" r="2"/><circle cx="12" cy="19" r="2"/><line x1="5" y1="12" x2="12" y2="5"/><line x1="12" y1="5" x2="19" y2="12"/><line x1="19" y1="12" x2="12" y2="19"/><line x1="12" y1="19" x2="5" y2="12"/></svg>
+              <Network :size="20" :stroke-width="2" />
               Cartographie
             </router-link>
           </li>
           <li>
             <router-link to="/networks" class="flex items-center gap-3">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1"/></svg>
+              <Wifi :size="20" :stroke-width="2" />
               Réseaux
             </router-link>
           </li>
           <li>
             <router-link to="/locations" class="flex items-center gap-3">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              <MapPin :size="20" :stroke-width="2" />
               Emplacements
             </router-link>
           </li>
           <li>
             <router-link to="/device-types" class="flex items-center gap-3">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.93 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-1.01 0-.83.67-1.5 1.5-1.5H16c3.14 0 5.5-2.36 5.5-5.5C21.5 6.5 17.5 2 12 2z"/><circle cx="13.5" cy="6.5" r="0.5" fill="currentColor"/><circle cx="17.5" cy="10.5" r="0.5" fill="currentColor"/><circle cx="8.5" cy="7.5" r="0.5" fill="currentColor"/><circle cx="6.5" cy="12.5" r="0.5" fill="currentColor"/></svg>
+              <Palette :size="20" :stroke-width="2" />
               Types
             </router-link>
           </li>
@@ -56,3 +56,7 @@
     </div>
   </div>
 </template>
+
+<script setup>
+import { Menu, Monitor, Network, Wifi, MapPin, Palette } from 'lucide-vue-next'
+</script>

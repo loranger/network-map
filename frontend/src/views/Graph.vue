@@ -3,7 +3,7 @@
     <div class="flex items-center justify-between mb-6">
       <h1 class="text-2xl font-bold">Cartographie</h1>
       <button class="btn btn-outline btn-sm" @click="refreshGraph">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+        <RefreshCw :size="16" :stroke-width="2" />
         Actualiser
       </button>
     </div>
@@ -22,6 +22,7 @@ import { useRouter } from 'vue-router'
 import cytoscape from 'cytoscape'
 import fcose from 'cytoscape-fcose'
 import axios from 'axios'
+import { RefreshCw } from 'lucide-vue-next'
 
 cytoscape.use(fcose)
 

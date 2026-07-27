@@ -3,7 +3,7 @@
     <div class="flex items-center justify-between mb-6">
       <h1 class="text-2xl font-bold">Réseaux</h1>
       <button class="btn btn-primary" onclick="net_modal.showModal()">
-        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        <Plus :size="18" :stroke-width="2" />
         Ajouter
       </button>
     </div>
@@ -28,7 +28,7 @@
           </div>
           <div class="card-actions justify-end mt-2">
             <button class="btn btn-ghost btn-xs" @click="deleteNetwork(net.id)">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+              <Trash2 :size="16" :stroke-width="2" />
             </button>
           </div>
         </div>
@@ -83,6 +83,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
+import { Plus, Trash2 } from 'lucide-vue-next'
 
 const networks = ref([])
 const form = ref({ name: '', type: 'wifi', ssid: '', subnet: '', gateway: '' })

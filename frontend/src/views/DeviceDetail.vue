@@ -2,7 +2,7 @@
   <div v-if="device">
     <div class="flex items-center gap-3 mb-6">
       <router-link to="/devices" class="btn btn-ghost btn-circle">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+        <ArrowLeft :size="20" :stroke-width="2" />
       </router-link>
       <h1 class="text-2xl font-bold">{{ capitalize(device.name) }}</h1>
       <span class="badge badge-lg text-white border-0" :style="{ backgroundColor: typeColor(device.device_type) }">{{ capitalize(device.device_type) }}</span>
@@ -71,7 +71,7 @@
             <div class="flex items-center justify-between">
               <h2 class="card-title">Ports</h2>
               <button class="btn btn-primary btn-sm" onclick="port_modal.showModal()">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                <Plus :size="16" :stroke-width="2" />
                 Ajouter un port
               </button>
             </div>
@@ -92,10 +92,10 @@
                     <td class="flex gap-1 items-center">
                       <input v-if="port.connected_device_id && portConnectionMap[port.connected_device_id]" type="color" :value="portConnectionMap[port.connected_device_id].color || '#94a3b8'" class="w-5 h-5 rounded cursor-pointer border-0 p-0" @input="updateConnColor(portConnectionMap[port.connected_device_id].id, $event.target.value)" title="Couleur du câble" />
                       <button class="btn btn-ghost btn-xs" @click="openConnectPort(port)">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                        <Link2 :size="14" :stroke-width="2" />
                       </button>
                       <button class="btn btn-ghost btn-xs" @click="deletePort(port.id)">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                        <Trash2 :size="14" :stroke-width="2" />
                       </button>
                     </td>
                   </tr>
@@ -111,16 +111,16 @@
           <div class="card-body">
             <h2 class="card-title">Actions</h2>
             <button class="btn btn-outline w-full" onclick="edit_modal.showModal()">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              <Pencil :size="16" :stroke-width="2" />
               Modifier
             </button>
             <button class="btn btn-outline w-full mt-2" @click="enrichDevice" :disabled="enriching">
-              <svg v-if="!enriching" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+              <Info v-if="!enriching" :size="16" :stroke-width="2" />
               <span v-else class="loading loading-spinner loading-xs"></span>
               Enrichir
             </button>
             <button class="btn btn-outline btn-error w-full mt-2" @click="remove">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+              <Trash2 :size="16" :stroke-width="2" />
               Supprimer
             </button>
           </div>
@@ -245,6 +245,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
+import { ArrowLeft, Plus, Link2, Trash2, Pencil, Info } from 'lucide-vue-next'
 
 const route = useRoute()
 const router = useRouter()
