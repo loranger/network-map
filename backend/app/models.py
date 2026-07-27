@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -20,7 +20,7 @@ class Device(Base):
     __tablename__ = "devices"
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, unique=True, index=True, nullable=False)
+    name = Column(String, nullable=False)
     device_type = Column(String, nullable=False)
     manufacturer = Column(String, nullable=True)
     model = Column(String, nullable=True)
@@ -48,6 +48,10 @@ class Device(Base):
     connections_b = relationship("Connection", back_populates="device_b",
                                  foreign_keys="Connection.device_b_id",
                                  cascade="all, delete-orphan")
+
+    __table_args__ = (
+        UniqueConstraint('name', 'location_id', name='uq_device_name_location'),
+    )
 
 
 class SwitchPort(Base):

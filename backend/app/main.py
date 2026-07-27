@@ -32,6 +32,16 @@ async def lifespan(app: FastAPI):
             conn.commit()
         except Exception:
             pass
+        try:
+            conn.execute(sql_text("DROP INDEX IF EXISTS ix_devices_name"))
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            conn.execute(sql_text("CREATE UNIQUE INDEX IF NOT EXISTS uq_device_name_location ON devices(name, location_id)"))
+            conn.commit()
+        except Exception:
+            pass
     with Session(engine) as session:
         existing = session.query(models.Location).count()
         if existing == 0:
@@ -124,10 +134,12 @@ def get_device(device_id: int, db: Session = Depends(get_db)):
 @app.post("/api/devices", response_model=schemas.DeviceResponse)
 def create_device(device: schemas.DeviceCreate, db: Session = Depends(get_db)):
     existing = db.query(models.Device).filter(
-        models.Device.name == device.name
+        models.Device.name == device.name,
+        models.Device.location_id.is_(device.location_id),
     ).first()
     if existing:
-        raise HTTPException(status_code=400, detail="Device name already exists")
+        loc_label = f" at this location" if device.location_id else " (no location)"
+        raise HTTPException(status_code=400, detail=f"Device name already exists{loc_label}")
     db_device = crud.create_device(db, device)
     db_device.location_name = db_device.location_ref.name if db_device.location_ref else None
     db_device.location_floor = db_device.location_ref.floor if db_device.location_ref else None
@@ -142,9 +154,11 @@ def update_device(
         existing = db.query(models.Device).filter(
             models.Device.name == device.name,
             models.Device.id != device_id,
+            models.Device.location_id.is_(device.location_id),
         ).first()
         if existing:
-            raise HTTPException(status_code=400, detail="Device name already exists")
+            loc_label = f" at this location" if device.location_id else " (no location)"
+            raise HTTPException(status_code=400, detail=f"Device name already exists{loc_label}")
     updated = crud.update_device(db, device_id, device)
     if not updated:
         raise HTTPException(status_code=404, detail="Device not found")
