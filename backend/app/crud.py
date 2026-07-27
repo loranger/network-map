@@ -1,3 +1,4 @@
+from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from . import models, schemas
@@ -167,7 +168,7 @@ def delete_network(db: Session, network_id: int):
 # --- Locations ---
 
 def get_locations(db: Session):
-    return db.query(models.Location).order_by(models.Location.name).all()
+    return db.query(models.Location).order_by(func.lower(models.Location.name)).all()
 
 
 def create_location(db: Session, loc: schemas.LocationCreate):
@@ -199,7 +200,7 @@ def update_location(db: Session, loc_id: int, loc: schemas.LocationUpdate):
 # --- Device Types ---
 
 def get_device_types(db: Session):
-    return db.query(models.DeviceType).order_by(models.DeviceType.label).all()
+    return db.query(models.DeviceType).order_by(func.lower(models.DeviceType.label)).all()
 
 
 def create_device_type(db: Session, dt: schemas.DeviceTypeCreate):
