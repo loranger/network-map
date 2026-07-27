@@ -151,7 +151,13 @@ function buildGraph(data) {
           'target-arrow-color': (el) => el.data('color'),
           'target-arrow-shape': 'triangle',
           'arrow-scale': 1,
-          'curve-style': 'straight',
+          'curve-style': 'unbundled-bezier',
+          'control-point-distances': (el) => {
+            const sum = el.data('source').split('').reduce((a, c) => a + c.charCodeAt(0), 0) +
+                        el.data('target').split('').reduce((a, c) => a + c.charCodeAt(0), 0)
+            return sum % 2 === 0 ? 25 : -25
+          },
+          'control-point-weights': 0.5,
           label: (el) => el.data('label'),
           'font-size': '10px',
           color: '#94a3b8',
