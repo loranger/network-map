@@ -40,14 +40,28 @@
       <table class="table table-zebra">
         <thead>
           <tr>
-            <th>Nom</th>
-            <th class="hidden md:table-cell">Type</th>
-            <th class="hidden sm:table-cell">IP</th>
+            <th class="cursor-pointer select-none" @click="toggleSort('name')">
+              Nom <span v-if="sortCol === 'name'" class="text-xs">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
+            </th>
+            <th class="hidden md:table-cell cursor-pointer select-none" @click="toggleSort('device_type')">
+              Type <span v-if="sortCol === 'device_type'" class="text-xs">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
+            </th>
+            <th class="hidden sm:table-cell cursor-pointer select-none" @click="toggleSort('ipv4')">
+              IP <span v-if="sortCol === 'ipv4'" class="text-xs">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
+            </th>
             <th class="hidden sm:table-cell">Type IP</th>
-            <th class="hidden lg:table-cell">MAC</th>
-            <th class="hidden xl:table-cell">Fabricant</th>
-            <th>Emplacement</th>
-            <th class="hidden xl:table-cell">Étage</th>
+            <th class="hidden lg:table-cell cursor-pointer select-none" @click="toggleSort('mac')">
+              MAC <span v-if="sortCol === 'mac'" class="text-xs">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
+            </th>
+            <th class="hidden xl:table-cell cursor-pointer select-none" @click="toggleSort('manufacturer')">
+              Fabricant <span v-if="sortCol === 'manufacturer'" class="text-xs">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
+            </th>
+            <th class="cursor-pointer select-none" @click="toggleSort('location_name')">
+              Emplacement <span v-if="sortCol === 'location_name'" class="text-xs">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
+            </th>
+            <th class="hidden xl:table-cell cursor-pointer select-none" @click="toggleSort('location_floor')">
+              Étage <span v-if="sortCol === 'location_floor'" class="text-xs">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
+            </th>
             <th class="hidden md:table-cell">Découvert</th>
             <th></th>
           </tr>
@@ -168,6 +182,8 @@ const deviceTypes = ref([])
 const filterName = ref('')
 const filterType = ref('')
 const filterLocation = ref('')
+const sortCol = ref('')
+const sortDir = ref('asc')
 const scanning = ref(false)
 const enriching = ref(false)
 
@@ -176,13 +192,30 @@ const form = ref({
 })
 
 const filteredDevices = computed(() => {
-  return devices.value.filter(d => {
+  let list = devices.value.filter(d => {
     if (filterName.value && !d.name.toLowerCase().includes(filterName.value.toLowerCase())) return false
     if (filterType.value && d.device_type !== filterType.value) return false
     if (filterLocation.value && d.location_id !== Number(filterLocation.value)) return false
     return true
   })
+  if (sortCol.value) {
+    list = [...list].sort((a, b) => {
+      const va = (a[sortCol.value] || '').toString().toLowerCase()
+      const vb = (b[sortCol.value] || '').toString().toLowerCase()
+      return sortDir.value === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va)
+    })
+  }
+  return list
 })
+
+function toggleSort(col) {
+  if (sortCol.value === col) {
+    sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    sortCol.value = col
+    sortDir.value = 'asc'
+  }
+}
 
 function capitalize(s) {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''
