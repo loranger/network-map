@@ -188,13 +188,13 @@
             </select>
           </div>
           <div class="form-control mb-3">
-            <label class="label"><span class="label-text">Notes</span></label>
-            <textarea v-model="editForm.notes" class="textarea textarea-bordered" rows="3"></textarea>
-          </div>
-          <div class="form-control mb-3">
             <label class="label"><span class="label-text">Interface d'administration</span></label>
             <input v-model="editForm.admin_url" class="input input-bordered font-mono" placeholder="http://{ip}:8080/admin" />
             <label class="label"><span class="label-text-alt text-xs opacity-60">Utilisez <code class="bg-base-300 px-1 rounded">{ip}</code> comme placeholder pour l'adresse IPv4</span></label>
+          </div>
+          <div class="form-control mb-3">
+            <label class="label"><span class="label-text">Notes</span></label>
+            <textarea v-model="editForm.notes" class="textarea textarea-bordered" rows="3"></textarea>
           </div>
           <div class="modal-action">
             <button type="button" class="btn" onclick="edit_modal.close()">Annuler</button>
