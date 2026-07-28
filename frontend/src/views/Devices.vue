@@ -62,7 +62,7 @@
             <th class="hidden xl:table-cell cursor-pointer select-none" @click="toggleSort('location_floor')">
               Étage <span v-if="sortCol === 'location_floor'" class="text-xs">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
             </th>
-            <th class="hidden md:table-cell">Découvert</th>
+            <th class="hidden md:table-cell">Admin</th>
             <th></th>
           </tr>
         </thead>
@@ -85,12 +85,10 @@
             <td>{{ capitalize(d.location_name) || '-' }}</td>
             <td class="hidden xl:table-cell">{{ capitalize(d.location_floor) || '-' }}</td>
             <td class="hidden md:table-cell">
-              <span v-if="d.discovered" class="text-success">
-                <Check :size="16" :stroke-width="2" />
-              </span>
-              <span v-else class="text-warning">
-                <X :size="16" :stroke-width="2" />
-              </span>
+              <a v-if="d.admin_url" :href="resolveAdminUrl(d)" target="_blank" rel="noopener noreferrer" class="link link-primary" @click.stop>
+                <ExternalLink :size="16" :stroke-width="2" />
+              </a>
+              <span v-else class="opacity-30">-</span>
             </td>
             <td>
               <button class="btn btn-ghost btn-xs" @click="deleteDevice(d.id)">
@@ -178,7 +176,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import axios from 'axios'
-import { Search, Download, Info, Plus, Trash2, Check, X } from '@lucide/vue'
+import { Search, Download, Info, Plus, Trash2, ExternalLink } from '@lucide/vue'
 
 const devices = ref([])
 const locations = ref([])
@@ -228,6 +226,12 @@ function capitalize(s) {
 function typeColor(type) {
   const found = deviceTypes.value.find(dt => dt.type === type)
   return found ? found.color : '#6b7280'
+}
+
+function resolveAdminUrl(d) {
+  if (!d.admin_url) return null
+  if (!d.ipv4) return d.admin_url
+  return d.admin_url.replace(/\{ip\}/g, d.ipv4)
 }
 
 function typeLabel(type) {
