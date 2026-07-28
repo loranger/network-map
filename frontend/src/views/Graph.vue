@@ -61,16 +61,12 @@ function buildGraph(data) {
 
   const floorSet = new Set()
   const locIndex = {}
-  const locChildCount = {}
   let idx = 0
   for (const n of data.nodes) {
     if (n.floor) floorSet.add(n.floor)
     const locKey = n.location_id ? `loc-${n.location_id}` : null
     if (n.location && locKey && !(locKey in locIndex)) {
       locIndex[locKey] = { name: n.location, sample: n }
-    }
-    if (locKey) {
-      locChildCount[locKey] = (locChildCount[locKey] || 0) + 1
     }
   }
 
@@ -109,7 +105,6 @@ function buildGraph(data) {
         label: val.name,
         color: color,
         parent: parentFloor,
-        childCount: locChildCount[locKey] || 0,
       },
       classes: 'location',
     })
@@ -184,7 +179,7 @@ function buildGraph(data) {
           'font-weight': 'bold',
           'font-size': '13px',
           color: 'data(color)',
-          'padding': (el) => el.data('childCount') === 1 ? '8px' : '16px',
+          'padding': '16px',
           'shape': 'round-rectangle',
           'compound-sizing-wrt-labels': 'include',
           'min-width': '120px',
@@ -252,6 +247,13 @@ function buildGraph(data) {
   })
 
   cy.add(elements)
+
+  cy.nodes('node.location').forEach(loc => {
+    const children = loc.children('node:childless')
+    if (children.length === 1) {
+      loc.style('padding', '8px')
+    }
+  })
 
   const layout = cy.layout({
     name: 'fcose',
