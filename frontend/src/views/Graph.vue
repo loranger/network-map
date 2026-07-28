@@ -248,6 +248,13 @@ function buildGraph(data) {
 
   cy.add(elements)
 
+  cy.nodes('node.location').forEach(loc => {
+    const children = loc.children('node:childless')
+    if (children.length === 1) {
+      loc.style('padding', '8px')
+    }
+  })
+
   const layout = cy.layout({
     name: 'fcose',
     animate: false,
