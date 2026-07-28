@@ -28,6 +28,11 @@ async def lifespan(app: FastAPI):
         except Exception:
             pass
         try:
+            conn.execute(sql_text("ALTER TABLE devices ADD COLUMN admin_url VARCHAR"))
+            conn.commit()
+        except Exception:
+            pass
+        try:
             conn.execute(sql_text("ALTER TABLE devices ADD COLUMN location_id INTEGER REFERENCES locations(id)"))
             conn.commit()
         except Exception:
