@@ -58,6 +58,14 @@
                 <label class="text-sm opacity-60">Découvert automatiquement</label>
                 <p>{{ device.discovered ? 'Oui' : 'Non' }}</p>
               </div>
+              <div v-if="device.admin_url">
+                <label class="text-sm opacity-60">Interface d'administration</label>
+                <p>
+                  <a v-if="resolvedAdminUrl" :href="resolvedAdminUrl" target="_blank" rel="noopener noreferrer" class="link link-primary font-mono break-all">{{ resolvedAdminUrl }}</a>
+                  <span v-else class="font-mono opacity-70">{{ device.admin_url }}</span>
+                </p>
+                <p v-if="device.ipv4 && device.admin_url.includes('{ip}')" class="text-xs opacity-50 mt-1">Placeholder <code class="bg-base-300 px-1 rounded">{ip}</code> résolu en {{ device.ipv4 }}</p>
+              </div>
             </div>
             <div v-if="device.notes" class="mt-4">
               <label class="text-sm opacity-60">Notes</label>
@@ -183,6 +191,11 @@
             <label class="label"><span class="label-text">Notes</span></label>
             <textarea v-model="editForm.notes" class="textarea textarea-bordered" rows="3"></textarea>
           </div>
+          <div class="form-control mb-3">
+            <label class="label"><span class="label-text">Interface d'administration</span></label>
+            <input v-model="editForm.admin_url" class="input input-bordered font-mono" placeholder="http://{ip}:8080/admin" />
+            <label class="label"><span class="label-text-alt text-xs opacity-60">Utilisez <code class="bg-base-300 px-1 rounded">{ip}</code> comme placeholder pour l'adresse IPv4</span></label>
+          </div>
           <div class="modal-action">
             <button type="button" class="btn" onclick="edit_modal.close()">Annuler</button>
             <button type="submit" class="btn btn-primary">Enregistrer</button>
@@ -284,6 +297,13 @@ const portConnectionMap = computed(() => {
 const availableDevices = computed(() =>
   allDevices.value.filter(d => d.id !== device.value?.id)
 )
+
+const resolvedAdminUrl = computed(() => {
+  if (!device.value?.admin_url) return null
+  const ip = device.value?.ipv4
+  if (!ip) return null
+  return device.value.admin_url.replace(/\{ip\}/g, ip)
+})
 
 function capitalize(s) {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''

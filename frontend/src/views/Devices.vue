@@ -161,6 +161,10 @@
               <option v-for="loc in locations" :key="loc.id" :value="loc.id">{{ capitalize(loc.name) }} ({{ loc.floor || '?' }})</option>
             </select>
           </div>
+          <div class="form-control mb-3">
+            <label class="label"><span class="label-text">Interface d'administration</span></label>
+            <input v-model="form.admin_url" class="input input-bordered font-mono" placeholder="http://{ip}:8080/admin" />
+          </div>
           <div class="modal-action">
             <button type="button" class="btn" onclick="add_modal.close()">Annuler</button>
             <button type="submit" class="btn btn-primary">Ajouter</button>
@@ -188,7 +192,7 @@ const scanning = ref(false)
 const enriching = ref(false)
 
 const form = ref({
-  name: '', device_type: 'computer', ipv4: '', mac: '', location_id: null,
+  name: '', device_type: 'computer', ipv4: '', mac: '', location_id: null, admin_url: '',
 })
 
 const filteredDevices = computed(() => {
@@ -248,7 +252,7 @@ async function fetchDeviceTypes() {
 
 async function addDevice() {
   await axios.post('/api/devices', form.value)
-  form.value = { name: '', device_type: 'computer', ipv4: '', mac: '', location_id: null }
+  form.value = { name: '', device_type: 'computer', ipv4: '', mac: '', location_id: null, admin_url: '' }
   document.getElementById('add_modal').close()
   fetchDevices()
 }

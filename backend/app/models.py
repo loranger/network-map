@@ -33,6 +33,7 @@ class Device(Base):
     floor = Column(String, nullable=True)
     location_id = Column(Integer, ForeignKey("locations.id", ondelete="SET NULL"), nullable=True)
     notes = Column(Text, nullable=True)
+    admin_url = Column(String, nullable=True)
     discovered = Column(Boolean, default=False)
     last_seen = Column(DateTime, nullable=True)
     created_at = Column(DateTime, server_default=func.now())

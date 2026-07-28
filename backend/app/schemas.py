@@ -57,6 +57,7 @@ class DeviceBase(BaseModel):
     ipv6: Optional[str] = None
     location_id: Optional[int] = None
     notes: Optional[str] = None
+    admin_url: Optional[str] = None
 
 
 class DeviceCreate(DeviceBase):
@@ -75,6 +76,7 @@ class DeviceUpdate(BaseModel):
     ipv6: Optional[str] = None
     location_id: Optional[int] = None
     notes: Optional[str] = None
+    admin_url: Optional[str] = None
 
 
 class DeviceResponse(DeviceBase):

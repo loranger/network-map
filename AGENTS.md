@@ -84,6 +84,7 @@ Stocké dans la table `devices`. Représente tout périphérique réseau.
 | ip_type | String? | static / dhcp |
 | location_id | Integer FK? | Référence vers locations.id |
 | notes | Text? | Notes libres |
+| admin_url | String? | URL interface d'admin (ex: http://{ip}:2112, le placeholder {ip} est résolu côté frontend) |
 | discovered | Boolean | Vrai si trouvé par scan automatique |
 | last_seen | DateTime? | Dernière date de détection |
 | created_at | DateTime | Auto |
