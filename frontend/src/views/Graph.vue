@@ -443,7 +443,7 @@ function arrangeFloorsVertically() {
   const totalTargetHeight = heights.reduce((s, h) => s + h, 0) + spacing * (sorted.length - 1)
   let y = clusterCenterY - totalTargetHeight / 2
 
-  for (let i = 0; i < sorted.length; i++) {
+  for (let i = sorted.length - 1; i >= 0; i--) {
     const f = sorted[i]
     const bb = f.boundingBox()
     const h = bb.y2 - bb.y1
