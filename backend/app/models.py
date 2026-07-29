@@ -1,8 +1,16 @@
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Table, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from .database import Base
+
+
+device_ap_networks = Table(
+    "device_ap_networks",
+    Base.metadata,
+    Column("device_id", Integer, ForeignKey("devices.id", ondelete="CASCADE"), primary_key=True),
+    Column("network_id", Integer, ForeignKey("networks.id", ondelete="CASCADE"), primary_key=True),
+)
 
 
 class Location(Base):
@@ -22,6 +30,7 @@ class DeviceIP(Base):
     id = Column(Integer, primary_key=True, index=True)
     device_id = Column(Integer, ForeignKey("devices.id", ondelete="CASCADE"), nullable=False)
     ipv4 = Column(String, nullable=True)
+    mac = Column(String, nullable=True)
     network_id = Column(Integer, ForeignKey("networks.id", ondelete="SET NULL"), nullable=True)
     ip_type = Column(String, nullable=True)
 
@@ -38,7 +47,6 @@ class Device(Base):
     manufacturer = Column(String, nullable=True)
     model = Column(String, nullable=True)
     hostname = Column(String, nullable=True)
-    mac = Column(String, nullable=True)
     location = Column(String, nullable=True)
     floor = Column(String, nullable=True)
     location_id = Column(Integer, ForeignKey("locations.id", ondelete="SET NULL"), nullable=True)
@@ -61,6 +69,12 @@ class Device(Base):
     connections_b = relationship("Connection", back_populates="device_b",
                                  foreign_keys="Connection.device_b_id",
                                  cascade="all, delete-orphan")
+    ap_networks = relationship("Network", secondary=device_ap_networks,
+                               back_populates="ap_devices")
+
+    @property
+    def ap_network_ids(self) -> list[int]:
+        return [n.id for n in self.ap_networks]
 
 
 class SwitchPort(Base):
@@ -119,3 +133,10 @@ class Network(Base):
     gateway = Column(String, nullable=True)
     dns = Column(String, nullable=True)
     color = Column(String, nullable=True)
+
+    @property
+    def ap_device_ids(self) -> list[int]:
+        return [d.id for d in self.ap_devices] if hasattr(self, 'ap_devices') else []
+
+    ap_devices = relationship("Device", secondary=device_ap_networks,
+                              back_populates="ap_networks")

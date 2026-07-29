@@ -34,6 +34,10 @@
         <option value="">Tous les emplacements</option>
         <option v-for="loc in locations" :key="loc.id" :value="loc.id">{{ capitalize(loc.name) }}</option>
       </select>
+      <select class="select select-bordered select-sm" v-model="filterNetwork">
+        <option value="">Tous les réseaux</option>
+        <option v-for="net in networks" :key="net.id" :value="net.id">{{ net.name }}</option>
+      </select>
     </div>
 
     <div class="overflow-x-auto">
@@ -46,10 +50,7 @@
             <th class="hidden md:table-cell cursor-pointer select-none" @click="toggleSort('device_type')">
               Type <span v-if="sortCol === 'device_type'" class="text-xs">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
             </th>
-            <th class="hidden sm:table-cell">IP</th>
-            <th class="hidden lg:table-cell cursor-pointer select-none" @click="toggleSort('mac')">
-              MAC <span v-if="sortCol === 'mac'" class="text-xs">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
-            </th>
+            <th class="hidden sm:table-cell">IP / MAC / Réseau</th>
             <th class="hidden xl:table-cell cursor-pointer select-none" @click="toggleSort('manufacturer')">
               Fabricant <span v-if="sortCol === 'manufacturer'" class="text-xs">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
             </th>
@@ -71,14 +72,16 @@
             <td class="hidden md:table-cell">
               <span class="badge text-white border-0" :style="{ backgroundColor: typeColor(d.device_type) }">{{ typeLabel(d.device_type) }}</span>
             </td>
-            <td class="hidden sm:table-cell font-mono text-sm">
-              <span v-if="d.ips && d.ips.length > 0">
-                {{ d.ips[0].ipv4 }}
-                <span v-if="d.ips.length > 1" class="badge badge-ghost badge-xs ml-1">+{{ d.ips.length - 1 }}</span>
-              </span>
+            <td class="hidden sm:table-cell text-sm">
+              <div v-if="d.ips && d.ips.length > 0" class="space-y-1.5">
+                <div v-for="ip in d.ips" :key="ip.id" class="flex items-center gap-1.5 flex-wrap">
+                  <span class="font-mono">{{ ip.ipv4 || '-' }}</span>
+                  <span v-if="ip.mac" class="font-mono text-[0.7rem] opacity-50">{{ ip.mac }}</span>
+                  <span v-if="ip.network_name" class="badge badge-sm border-0 text-white" :style="{ backgroundColor: networkColor(ip.network_id) }">{{ ip.network_name }}</span>
+                </div>
+              </div>
               <span v-else class="opacity-40">-</span>
             </td>
-            <td class="hidden lg:table-cell font-mono text-sm">{{ d.mac || '-' }}</td>
             <td class="hidden xl:table-cell text-sm">{{ d.manufacturer || '-' }}</td>
             <td>{{ capitalize(d.location_name) || '-' }}</td>
             <td class="hidden xl:table-cell">{{ capitalize(d.location_floor) || '-' }}</td>
@@ -95,7 +98,7 @@
             </td>
           </tr>
           <tr v-if="filteredDevices.length === 0">
-            <td colspan="10" class="text-center text-base-content/50 py-8">
+            <td colspan="9" class="text-center text-base-content/50 py-8">
               Aucun périphérique trouvé
             </td>
           </tr>
@@ -147,10 +150,6 @@
             <input v-model="form.ip" class="input input-bordered" placeholder="192.168.1.x" />
           </div>
           <div class="form-control mb-3">
-            <label class="label"><span class="label-text">Adresse MAC</span></label>
-            <input v-model="form.mac" class="input input-bordered" placeholder="XX:XX:XX:XX:XX:XX" />
-          </div>
-          <div class="form-control mb-3">
             <label class="label"><span class="label-text">Emplacement</span></label>
             <select v-model="form.location_id" class="select select-bordered">
               <option :value="null">- Aucun -</option>
@@ -178,17 +177,19 @@ import { Search, Download, Info, Plus, Trash2, ExternalLink } from '@lucide/vue'
 
 const devices = ref([])
 const locations = ref([])
+const networks = ref([])
 const deviceTypes = ref([])
 const filterName = ref('')
 const filterType = ref('')
 const filterLocation = ref('')
+const filterNetwork = ref('')
 const sortCol = ref('name')
 const sortDir = ref('asc')
 const scanning = ref(false)
 const enriching = ref(false)
 
 const form = ref({
-  name: '', device_type: 'computer', ip: '', mac: '', location_id: null, admin_url: '',
+  name: '', device_type: 'computer', ip: '', location_id: null, admin_url: '',
 })
 
 const filteredDevices = computed(() => {
@@ -196,6 +197,13 @@ const filteredDevices = computed(() => {
     if (filterName.value && !d.name.toLowerCase().includes(filterName.value.toLowerCase())) return false
     if (filterType.value && d.device_type !== filterType.value) return false
     if (filterLocation.value && d.location_id !== Number(filterLocation.value)) return false
+    if (filterNetwork.value) {
+      const netId = Number(filterNetwork.value)
+      const ipNetIds = (d.ips || []).map(ip => ip.network_id).filter(id => id != null)
+      const apNetIds = d.ap_network_ids || []
+      const allNetIds = [...ipNetIds, ...apNetIds]
+      if (!allNetIds.includes(netId)) return false
+    }
     return true
   })
   if (sortCol.value) {
@@ -238,6 +246,11 @@ function typeLabel(type) {
   return found ? found.label : type
 }
 
+function networkColor(networkId) {
+  const found = networks.value.find(n => n.id === networkId)
+  return found?.color || '#6b7280'
+}
+
 async function fetchDevices() {
   const { data } = await axios.get('/api/devices')
   devices.value = data
@@ -253,17 +266,21 @@ async function fetchDeviceTypes() {
   deviceTypes.value = data
 }
 
+async function fetchNetworks() {
+  const { data } = await axios.get('/api/networks')
+  networks.value = data
+}
+
 async function addDevice() {
   const payload = {
     name: form.value.name,
     device_type: form.value.device_type,
-    mac: form.value.mac,
     location_id: form.value.location_id,
     admin_url: form.value.admin_url,
     ips: form.value.ip ? [{ ipv4: form.value.ip }] : [],
   }
   await axios.post('/api/devices', payload)
-  form.value = { name: '', device_type: 'computer', ip: '', mac: '', location_id: null, admin_url: '' }
+  form.value = { name: '', device_type: 'computer', ip: '', location_id: null, admin_url: '' }
   document.getElementById('add_modal').close()
   fetchDevices()
 }
@@ -327,5 +344,6 @@ onMounted(() => {
   fetchDevices()
   fetchLocations()
   fetchDeviceTypes()
+  fetchNetworks()
 })
 </script>

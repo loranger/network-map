@@ -48,6 +48,7 @@ class LocationResponse(LocationBase):
 
 class DeviceIPCreate(BaseModel):
     ipv4: Optional[str] = None
+    mac: Optional[str] = None
     network_id: Optional[int] = None
     ip_type: Optional[str] = None
 
@@ -56,6 +57,7 @@ class DeviceIPResponse(BaseModel):
     id: int
     device_id: int
     ipv4: Optional[str] = None
+    mac: Optional[str] = None
     network_id: Optional[int] = None
     ip_type: Optional[str] = None
     network_name: Optional[str] = None
@@ -69,8 +71,8 @@ class DeviceBase(BaseModel):
     hostname: Optional[str] = None
     manufacturer: Optional[str] = None
     model: Optional[str] = None
-    mac: Optional[str] = None
     location_id: Optional[int] = None
+    ap_network_ids: list[int] = []
     notes: Optional[str] = None
     admin_url: Optional[str] = None
 
@@ -85,8 +87,8 @@ class DeviceUpdate(BaseModel):
     hostname: Optional[str] = None
     manufacturer: Optional[str] = None
     model: Optional[str] = None
-    mac: Optional[str] = None
     location_id: Optional[int] = None
+    ap_network_ids: Optional[list[int]] = None
     notes: Optional[str] = None
     admin_url: Optional[str] = None
     ips: Optional[list[DeviceIPCreate]] = None
@@ -160,6 +162,7 @@ class NetworkUpdate(BaseModel):
     gateway: Optional[str] = None
     dns: Optional[str] = None
     color: Optional[str] = None
+    ap_device_ids: Optional[list[int]] = None
 
     @field_validator("subnet")
     @classmethod
@@ -174,6 +177,7 @@ class NetworkUpdate(BaseModel):
 
 class NetworkResponse(NetworkBase):
     id: int
+    ap_device_ids: list[int] = []
 
     model_config = {"from_attributes": True}
 

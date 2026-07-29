@@ -80,12 +80,68 @@ async def lifespan(app: FastAPI):
         except Exception:
             pass
         try:
+            conn.execute(sql_text("""
+                CREATE TABLE IF NOT EXISTS device_ap_networks (
+                    device_id INTEGER REFERENCES devices(id) ON DELETE CASCADE,
+                    network_id INTEGER REFERENCES networks(id) ON DELETE CASCADE,
+                    PRIMARY KEY (device_id, network_id)
+                )
+            """))
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            conn.execute(sql_text("""
+                INSERT OR IGNORE INTO device_ap_networks (device_id, network_id)
+                SELECT id, ap_network_id FROM devices WHERE ap_network_id IS NOT NULL
+            """))
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            conn.execute(sql_text("ALTER TABLE devices DROP COLUMN ap_network_id"))
+            conn.commit()
+        except Exception:
+            pass
+        try:
             conn.execute(sql_text("DROP INDEX IF EXISTS ix_devices_name"))
             conn.commit()
         except Exception:
             pass
         try:
             conn.execute(sql_text("DROP INDEX IF EXISTS uq_device_name_location"))
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            conn.execute(sql_text("ALTER TABLE device_ips ADD COLUMN mac VARCHAR"))
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            conn.execute(sql_text("""
+                UPDATE device_ips SET mac = (
+                    SELECT mac FROM devices WHERE devices.id = device_ips.device_id
+                ) WHERE mac IS NULL AND device_id IN (
+                    SELECT id FROM devices WHERE mac IS NOT NULL
+                )
+            """))
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            conn.execute(sql_text("""
+                INSERT INTO device_ips (device_id, mac)
+                SELECT id, mac FROM devices
+                WHERE mac IS NOT NULL AND id NOT IN (
+                    SELECT DISTINCT device_id FROM device_ips
+                )
+            """))
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            conn.execute(sql_text("ALTER TABLE devices DROP COLUMN mac"))
             conn.commit()
         except Exception:
             pass
@@ -416,9 +472,10 @@ def import_arp(data: ArpImportInput, db: Session = Depends(get_db)):
         ip, mac, hostname = d["ip"], d.get("mac"), d.get("hostname")
         existing = None
         if mac:
-            existing = db.query(models.Device).filter(
-                models.Device.mac == mac
+            ip_entry = db.query(models.DeviceIP).filter(
+                models.DeviceIP.mac == mac
             ).first()
+            existing = ip_entry.device if ip_entry else None
         if not existing and ip:
             existing = db.query(models.Device).filter(
                 models.Device.ips.any(models.DeviceIP.ipv4 == ip)
@@ -426,15 +483,17 @@ def import_arp(data: ArpImportInput, db: Session = Depends(get_db)):
         if existing:
             existing.last_seen = datetime.utcnow()
             existing.discovered = True
-            if mac and not existing.mac:
-                existing.mac = mac
             if hostname and not existing.hostname:
                 existing.hostname = hostname
             if hostname and existing.name.startswith("device-"):
                 short = hostname.split(".")[0] if "." in hostname else hostname
                 existing.name = short
-            if ip and not any(dev_ip.ipv4 == ip for dev_ip in existing.ips):
-                dev_ip = models.DeviceIP(device_id=existing.id, ipv4=ip)
+            ip_match = next((dev_ip for dev_ip in existing.ips if dev_ip.ipv4 == ip), None)
+            if ip_match:
+                if mac and not ip_match.mac:
+                    ip_match.mac = mac
+            elif ip:
+                dev_ip = models.DeviceIP(device_id=existing.id, ipv4=ip, mac=mac)
                 crud.auto_assign_network(db, dev_ip)
                 db.add(dev_ip)
             updated += 1
@@ -444,10 +503,9 @@ def import_arp(data: ArpImportInput, db: Session = Depends(get_db)):
             new_device = crud.create_device(db, schemas.DeviceCreate(
                 name=name,
                 device_type="other",
-                mac=mac,
                 hostname=hostname,
                 discovered=True,
-                ips=[schemas.DeviceIPCreate(ipv4=ip)],
+                ips=[schemas.DeviceIPCreate(ipv4=ip, mac=mac)],
             ))
             created += 1
             result = do_enrich(db, new_device)
@@ -473,6 +531,8 @@ def enrich_device(device_id: int, db: Session = Depends(get_db)):
     db.refresh(device)
     device.location_name = device.location_ref.name if device.location_ref else None
     device.location_floor = device.location_ref.floor if device.location_ref else None
+    for ip in device.ips:
+        ip.network_name = ip.network.name if ip.network else None
     for p in device.ports:
         if p.connected_device:
             p.connected_device_name = p.connected_device.name

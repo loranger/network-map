@@ -152,11 +152,14 @@ def reverse_dns(ip: str) -> Optional[str]:
 
 def enrich_device(db: Session, device: models.Device) -> dict:
     updated = {}
-    if device.mac and not device.manufacturer:
-        mfr = lookup_oui(device.mac)
-        if mfr:
-            device.manufacturer = mfr
-            updated["manufacturer"] = mfr
+    if not device.manufacturer:
+        for ip in device.ips:
+            if ip.mac:
+                mfr = lookup_oui(ip.mac)
+                if mfr:
+                    device.manufacturer = mfr
+                    updated["manufacturer"] = mfr
+                    break
     first_ip = device.ips[0].ipv4 if device.ips else None
     if first_ip:
         hn = reverse_dns(first_ip) if not device.hostname else device.hostname

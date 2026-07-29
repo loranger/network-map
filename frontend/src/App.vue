@@ -41,6 +41,12 @@
               </summary>
               <ul class="ml-6">
                 <li>
+                  <router-link to="/device-types" class="flex items-center gap-3">
+                    <Shapes :size="18" :stroke-width="2" />
+                    Types
+                  </router-link>
+                </li>
+                <li>
                   <router-link to="/networks" class="flex items-center gap-3">
                     <Wifi :size="18" :stroke-width="2" />
                     Réseaux
@@ -50,12 +56,6 @@
                   <router-link to="/locations" class="flex items-center gap-3">
                     <MapPin :size="18" :stroke-width="2" />
                     Emplacements
-                  </router-link>
-                </li>
-                <li>
-                  <router-link to="/device-types" class="flex items-center gap-3">
-                    <Shapes :size="18" :stroke-width="2" />
-                    Types
                   </router-link>
                 </li>
               </ul>

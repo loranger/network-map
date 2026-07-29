@@ -20,10 +20,6 @@
             <p class="font-mono">{{ device.hostname || '-' }}</p>
           </div>
           <div>
-            <label class="text-sm opacity-60">Adresse MAC</label>
-            <p class="font-mono">{{ device.mac || '-' }}</p>
-          </div>
-          <div>
             <label class="text-sm opacity-60">Emplacement</label>
             <p>{{ capitalize(device.location_name) || '-' }} <span v-if="device.location_floor" class="opacity-50">({{ capitalize(device.location_floor) }})</span></p>
           </div>
@@ -49,14 +45,15 @@
           </div>
         </div>
 
-        <div class="mt-4">
+         <div class="mt-4">
           <label class="text-sm opacity-60 block mb-1">Adresses IP</label>
           <div v-if="device.ips && device.ips.length > 0" class="space-y-1">
-            <div v-for="ip in device.ips" :key="ip.id" class="flex items-center gap-2 font-mono text-sm">
+            <div v-for="ip in device.ips" :key="ip.id" class="flex items-center gap-2 font-mono text-sm flex-wrap">
               <span>{{ ip.ipv4 }}</span>
               <span v-if="ip.network_name" class="badge badge-sm border-0 text-white" :style="{ backgroundColor: networkColor(ip.network_id) }">{{ ip.network_name }}</span>
               <span v-if="ip.ip_type === 'static'" class="badge badge-outline badge-xs">Static</span>
               <span v-else-if="ip.ip_type === 'dhcp'" class="badge badge-outline badge-xs">DHCP</span>
+              <span v-if="ip.mac" class="text-xs opacity-50">{{ ip.mac }}</span>
             </div>
           </div>
           <p v-else class="text-sm opacity-50">-</p>
@@ -156,6 +153,9 @@
                 <option value="dhcp">DHCP</option>
               </select>
             </div>
+            <div class="flex-[2]">
+              <input v-model="ipEntry.mac" class="input input-bordered input-sm w-full font-mono" placeholder="XX:XX:XX:XX:XX:XX" />
+            </div>
             <button type="button" class="btn btn-ghost btn-xs mb-0.5" @click="removeIp(idx)">
               <X :size="16" :stroke-width="2" />
             </button>
@@ -164,11 +164,6 @@
             <Plus :size="14" :stroke-width="2" />
             Ajouter une IP
           </button>
-
-          <div class="form-control mb-3">
-            <label class="label"><span class="label-text">Adresse MAC</span></label>
-            <input v-model="editForm.mac" class="input input-bordered" placeholder="XX:XX:XX:XX:XX:XX" />
-          </div>
 
           <div class="form-control mb-3">
             <label class="label"><span class="label-text">Interface d'administration</span></label>
@@ -278,7 +273,7 @@ const locations = ref([])
 const networks = ref([])
 const deviceTypes = ref([])
 
-const editForm = ref({ name: '', device_type: 'other', ips: [], hostname: '', manufacturer: '', model: '', mac: '', notes: '', admin_url: '', location_id: null })
+const editForm = ref({ name: '', device_type: 'other', ips: [], hostname: '', manufacturer: '', model: '', notes: '', admin_url: '', location_id: null })
 const portForm = ref({ name: '', vlan: '', poe: false })
 const connectPort = ref(null)
 
@@ -354,18 +349,18 @@ function openEditModal() {
     hostname: device.value.hostname || '',
     manufacturer: device.value.manufacturer || '',
     model: device.value.model || '',
-    mac: device.value.mac || '',
     notes: device.value.notes || '',
     admin_url: device.value.admin_url || '',
     location_id: device.value.location_id,
     ips: (device.value.ips || []).map(ip => ({
       ipv4: ip.ipv4 || '',
+      mac: ip.mac || '',
       network_id: ip.network_id,
       ip_type: ip.ip_type || '',
     })),
   }
   if (editForm.value.ips.length === 0) {
-    editForm.value.ips.push({ ipv4: '', network_id: null, ip_type: '' })
+    editForm.value.ips.push({ ipv4: '', mac: '', network_id: null, ip_type: '' })
   }
   editModal.value?.showModal()
 }
@@ -375,7 +370,7 @@ function closeEditModal() {
 }
 
 function addIp() {
-  editForm.value.ips.push({ ipv4: '', network_id: null, ip_type: '' })
+  editForm.value.ips.push({ ipv4: '', mac: '', network_id: null, ip_type: '' })
 }
 
 function removeIp(idx) {

@@ -27,6 +27,12 @@
           <div v-if="net.gateway" class="text-sm font-mono">
             <span class="opacity-60">Passerelle:</span> {{ net.gateway }}
           </div>
+          <div v-if="net.ap_device_ids?.length" class="text-sm">
+            <span class="opacity-60">APs:</span>
+            <span v-for="(aid, i) in net.ap_device_ids" :key="aid">
+              {{ i > 0 ? ', ' : '' }}{{ apMap[aid] || '?' }}
+            </span>
+          </div>
           <div class="card-actions justify-end mt-2">
             <button class="btn btn-ghost btn-xs" @click="openEdit(net)">
               <Pencil :size="16" :stroke-width="2" />
@@ -90,7 +96,7 @@
     </dialog>
 
     <dialog ref="editNetModal" class="modal">
-      <div class="modal-box">
+      <div class="modal-box max-w-xl">
         <h3 class="text-lg font-bold mb-4">Modifier le réseau</h3>
         <form @submit.prevent="updateNetwork">
           <div class="form-control mb-3">
@@ -104,6 +110,17 @@
               <option value="mesh">Mesh</option>
               <option value="wired">Filaire</option>
             </select>
+          </div>
+          <div v-if="editForm.type === 'wifi' || editForm.type === 'mesh'" class="form-control mb-3">
+            <label class="label"><span class="label-text">Points d'accès</span></label>
+            <div class="max-h-40 overflow-y-auto border border-base-300 rounded-lg p-2 space-y-1">
+              <label v-for="ap in apDevices" :key="ap.id" class="flex items-center gap-2 cursor-pointer text-sm">
+                <input type="checkbox" :value="ap.id" v-model="editForm.ap_device_ids" class="checkbox checkbox-xs" />
+                <span>{{ ap.name }}</span>
+                <span v-if="ap.ips?.[0]?.ipv4" class="text-xs opacity-50 font-mono">{{ ap.ips[0].ipv4 }}</span>
+              </label>
+              <div v-if="apDevices.length === 0" class="text-sm opacity-50 text-center py-2">Aucun point d'accès trouvé</div>
+            </div>
           </div>
           <div class="form-control mb-3">
             <label class="label"><span class="label-text">SSID</span></label>
@@ -140,6 +157,8 @@ import axios from 'axios'
 import { Plus, Pencil, Trash2 } from '@lucide/vue'
 
 const networks = ref([])
+const apDevices = ref([])
+const apMap = ref({})
 const netModal = ref(null)
 const editNetModal = ref(null)
 
@@ -151,11 +170,21 @@ function randomDarkColor() {
 }
 
 const form = ref({ name: '', type: 'wifi', ssid: '', subnet: '', gateway: '', color: '' })
-const editForm = ref({ name: '', type: 'wifi', ssid: '', subnet: '', gateway: '', color: '' })
+const editForm = ref({ name: '', type: 'wifi', ssid: '', subnet: '', gateway: '', color: '', ap_device_ids: [] })
 
 async function fetchNetworks() {
   const { data } = await axios.get('/api/networks')
   networks.value = data
+}
+
+async function fetchApDevices() {
+  const { data } = await axios.get('/api/devices', { params: { type: 'ap' } })
+  apDevices.value = data
+  const map = {}
+  for (const d of data) {
+    map[d.id] = d.name
+  }
+  apMap.value = map
 }
 
 function openAdd() {
@@ -174,7 +203,7 @@ async function addNetwork() {
 }
 
 function openEdit(net) {
-  editForm.value = { id: net.id, name: net.name, type: net.type, ssid: net.ssid || '', subnet: net.subnet || '', gateway: net.gateway || '', color: net.color || '' }
+  editForm.value = { id: net.id, name: net.name, type: net.type, ssid: net.ssid || '', subnet: net.subnet || '', gateway: net.gateway || '', color: net.color || '', ap_device_ids: net.ap_device_ids ? [...net.ap_device_ids] : [] }
   editNetModal.value?.showModal()
 }
 
@@ -183,14 +212,18 @@ function closeEdit() {
 }
 
 async function updateNetwork() {
-  await axios.put(`/api/networks/${editForm.value.id}`, {
+  const payload = {
     name: editForm.value.name,
     type: editForm.value.type,
     ssid: editForm.value.ssid,
     subnet: editForm.value.subnet,
     gateway: editForm.value.gateway,
     color: editForm.value.color,
-  })
+  }
+  if (editForm.value.type === 'wifi' || editForm.value.type === 'mesh') {
+    payload.ap_device_ids = editForm.value.ap_device_ids
+  }
+  await axios.put(`/api/networks/${editForm.value.id}`, payload)
   editNetModal.value?.close()
   fetchNetworks()
 }
@@ -201,5 +234,8 @@ async function deleteNetwork(id) {
   fetchNetworks()
 }
 
-onMounted(fetchNetworks)
+onMounted(() => {
+  fetchNetworks()
+  fetchApDevices()
+})
 </script>

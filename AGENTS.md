@@ -264,6 +264,19 @@ Si un hostname est trouvé par reverse DNS **et** que le nom du device commence 
 
 ## Déploiement
 
+### Règle absolue : tout dans Docker
+
+**Ne jamais exécuter Python, npm, ou tout outil de build/local en dehors de Docker.** Tous les changements (backend, frontend) sont buildés et testés exclusivement via Docker Compose :
+
+```bash
+docker compose build --no-cache backend    # backend uniquement
+docker compose build --no-cache frontend   # frontend uniquement
+docker compose build --no-cache            # les deux
+docker compose down && docker compose up -d
+```
+
+Exception : `bash scan-host.sh` (tourne sur l'hôte macOS car le scan ARP depuis Docker est limité).
+
 ### Docker Compose (production)
 
 ```bash
@@ -276,22 +289,18 @@ Deux services :
 - **backend** (port 8000) : API FastAPI avec volume persistant pour SQLite
 - **frontend** (port 8080) : Nginx servant le build static + proxy `/api/` via `localhost:8000`
 
-### Développement local
+### Règle absolue : tout dans Docker
+
+**Ne jamais exécuter Python, npm, ou tout outil de build/local en dehors de Docker.** Tous les changements (backend, frontend) sont buildés et testés exclusivement via Docker Compose :
 
 ```bash
-# Backend
-cd backend
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
-
-# Frontend
-cd frontend
-npm install
-npm run dev    # → http://localhost:5173 (proxy /api → localhost:8000)
+docker compose build --no-cache backend    # backend uniquement
+docker compose build --no-cache frontend   # frontend uniquement
+docker compose build --no-cache            # les deux
+docker compose down && docker compose up -d
 ```
 
-En dev, Vite proxyifie `/api` vers `localhost:8000` (voir `vite.config.js`).
+Exception : `bash scan-host.sh` (tourne sur l'hôte macOS car le scan ARP depuis Docker est limité).
 
 ### Scan réseau
 
@@ -319,6 +328,7 @@ Pour que nmap donne les vrais périphériques du LAN, le backend doit partager l
 5. **Pas de `onclick=` dans les templates Vue** — toujours utiliser `@click` avec une fonction définie dans `<script setup>`. Le `onclick=` HTML crée des dépendances globales implicites et contourne Vue.
 6. **Pas de `document.getElementById().showModal()`** — utiliser les template refs Vue (`ref="modal"`, `modal.value.showModal()`).
 7. **Purger les `console.log` de debug** avant de proposer un commit.
+8. **Tout dans Docker** — ne jamais exécuter Python, npm, ou tout outil de build/local en dehors de Docker. Build et test exclusivement via `docker compose build --no-cache && docker compose down && docker compose up -d`.
 
 ## Bonnes pratiques pour l'IA
 

@@ -46,9 +46,13 @@ def get_device(db: Session, device_id: int):
 def create_device(db: Session, device: schemas.DeviceCreate):
     data = device.model_dump()
     ips_data = data.pop("ips", [])
+    ap_net_ids = data.pop("ap_network_ids", [])
     db_device = models.Device(**data)
     db.add(db_device)
     db.flush()
+    if ap_net_ids:
+        nets = db.query(models.Network).filter(models.Network.id.in_(ap_net_ids)).all()
+        db_device.ap_networks = nets
     existing_ips = set()
     for row in db.query(models.DeviceIP.ipv4).filter(models.DeviceIP.ipv4.isnot(None)).all():
         existing_ips.add(row[0])
@@ -71,6 +75,10 @@ def update_device(db: Session, device_id: int, device: schemas.DeviceUpdate):
         return None
     data = device.model_dump(exclude_unset=True)
     ips_data = data.pop("ips", None)
+    ap_net_ids = data.pop("ap_network_ids", None)
+    if ap_net_ids is not None:
+        nets = db.query(models.Network).filter(models.Network.id.in_(ap_net_ids)).all()
+        db_device.ap_networks = nets
     if ips_data is not None:
         existing_ips = set()
         for row in db.query(models.DeviceIP.ipv4).filter(
@@ -215,7 +223,9 @@ def delete_connection(db: Session, conn_id: int):
 # --- Networks ---
 
 def get_networks(db: Session, skip: int = 0, limit: int = 100):
-    return db.query(models.Network).offset(skip).limit(limit).all()
+    return db.query(models.Network).options(
+        joinedload(models.Network.ap_devices)
+    ).offset(skip).limit(limit).all()
 
 
 def create_network(db: Session, network: schemas.NetworkCreate):
@@ -238,11 +248,25 @@ def delete_network(db: Session, network_id: int):
 
 def update_network(db: Session, network_id: int, net: schemas.NetworkUpdate):
     db_net = db.query(models.Network).filter(models.Network.id == network_id).first()
-    if db_net:
-        for key, value in net.model_dump(exclude_unset=True).items():
-            setattr(db_net, key, value)
-        db.commit()
-        db.refresh(db_net)
+    if not db_net:
+        return None
+    data = net.model_dump(exclude_unset=True)
+    ap_ids = data.pop("ap_device_ids", None)
+    if ap_ids is not None:
+        old_aps = db.query(models.Device).filter(
+            models.Device.ap_networks.any(models.Network.id == network_id)
+        ).all()
+        for d in old_aps:
+            d.ap_networks = [n for n in d.ap_networks if n.id != network_id]
+        new_devices = db.query(models.Device).filter(
+            models.Device.id.in_(ap_ids)
+        ).all()
+        for d in new_devices:
+            d.ap_networks.append(db_net)
+    for key, value in data.items():
+        setattr(db_net, key, value)
+    db.commit()
+    db.refresh(db_net)
     return db_net
 
 
@@ -316,11 +340,13 @@ def get_graph_data(db: Session) -> schemas.GraphData:
     devices = db.query(models.Device).options(
         joinedload(models.Device.location_ref),
         joinedload(models.Device.ips).joinedload(models.DeviceIP.network),
+        joinedload(models.Device.ap_networks),
     ).all()
     connections = db.query(models.Connection).options(
         joinedload(models.Connection.network),
     ).all()
 
+    device_map = {d.id: d for d in devices}
     type_colors = {}
     for dt in db.query(models.DeviceType).all():
         type_colors[dt.type] = dt.color
@@ -333,6 +359,8 @@ def get_graph_data(db: Session) -> schemas.GraphData:
         net_ids = list(set(
             ip.network_id for ip in d.ips if ip.network_id is not None
         ))
+        for ap_net in d.ap_networks:
+            net_ids.append(ap_net.id)
         if not net_ids and d.device_type == 'switch':
             wired = db.query(models.Network).filter(
                 models.Network.type == 'wired'
@@ -352,6 +380,11 @@ def get_graph_data(db: Session) -> schemas.GraphData:
             "network_ids": net_ids,
         })
 
+    manual_pairs = set()
+    for c in connections:
+        manual_pairs.add((c.device_a_id, c.device_b_id))
+        manual_pairs.add((c.device_b_id, c.device_a_id))
+
     edges = []
     for c in connections:
         edge_color = c.color or (c.network.color if c.network else None) or "#94a3b8"
@@ -359,9 +392,87 @@ def get_graph_data(db: Session) -> schemas.GraphData:
             "from": c.device_a_id,
             "to": c.device_b_id,
             "label": c.technology or c.type,
-            "dashes": c.type == "wireless",
+            "edge_type": c.type,
             "color": {"color": edge_color},
             "network_id": c.network_id,
         })
+
+    # Auto-generate wireless edges for wifi/mesh networks
+    auto_seen = set()
+    networks = db.query(models.Network).filter(
+        models.Network.type.in_(["wifi", "mesh"])
+    ).all()
+    for net in networks:
+        ap_ids = [d.id for d in devices if any(n.id == net.id for n in d.ap_networks)]
+        if not ap_ids:
+            continue
+
+        client_ids = []
+        for d in devices:
+            ip_net_ids = [ip.network_id for ip in d.ips if ip.network_id == net.id]
+            if ip_net_ids and d.id not in ap_ids:
+                client_ids.append(d.id)
+
+        network_color = net.color or "#94a3b8"
+
+        # Backbone: full mesh between APs
+        for i in range(len(ap_ids)):
+            for j in range(i + 1, len(ap_ids)):
+                pair = (ap_ids[i], ap_ids[j])
+                if pair in manual_pairs:
+                    continue
+                key = (ap_ids[i], ap_ids[j], net.id)
+                if key in auto_seen:
+                    continue
+                auto_seen.add(key)
+                edges.append({
+                    "from": ap_ids[i],
+                    "to": ap_ids[j],
+                    "label": net.name,
+                    "edge_type": "backbone",
+                    "color": {"color": network_color},
+                    "network_id": net.id,
+                })
+
+        # Client → AP proximity (same location, then same floor)
+        if ap_ids:
+            ap_loc_map = {}
+            ap_floor_map = {}
+            for aid in ap_ids:
+                d = device_map.get(aid)
+                if d:
+                    ap_loc_map[aid] = d.location_id
+                    ap_floor_map[aid] = d.location_ref.floor if d.location_ref else None
+            for cid in client_ids:
+                cd = device_map.get(cid)
+                client_loc = cd.location_id if cd else None
+                client_floor = cd.location_ref.floor if (cd and cd.location_ref) else None
+                target_ap = None
+                for aid, loc in ap_loc_map.items():
+                    if loc is not None and loc == client_loc:
+                        target_ap = aid
+                        break
+                if target_ap is None and client_floor:
+                    for aid, floor in ap_floor_map.items():
+                        if floor is not None and floor == client_floor:
+                            target_ap = aid
+                            break
+                if target_ap is None:
+                    target_ap = ap_ids[0]
+                pair = (cid, target_ap)
+                if pair in manual_pairs:
+                    continue
+                key = (cid, target_ap, net.id)
+                if key in auto_seen:
+                    continue
+                auto_seen.add(key)
+                edges.append({
+                    "from": cid,
+                    "to": target_ap,
+                    "label": "wifi",
+                    "edge_type": "wifi",
+                    "color": {"color": network_color},
+                    "network_id": net.id,
+                })
 
     return schemas.GraphData(nodes=nodes, edges=edges)

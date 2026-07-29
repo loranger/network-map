@@ -80,9 +80,10 @@ def _persist(devices: list[dict], db: Session):
         ip, mac, hostname = d["ip"], d.get("mac"), d.get("hostname")
         existing = None
         if mac:
-            existing = db.query(models.Device).filter(
-                models.Device.mac == mac
+            ip_entry = db.query(models.DeviceIP).filter(
+                models.DeviceIP.mac == mac
             ).first()
+            existing = ip_entry.device if ip_entry else None
         if not existing and ip:
             existing = db.query(models.Device).filter(
                 models.Device.ips.any(models.DeviceIP.ipv4 == ip)
@@ -90,15 +91,17 @@ def _persist(devices: list[dict], db: Session):
         if existing:
             existing.last_seen = datetime.utcnow()
             existing.discovered = True
-            if mac and not existing.mac:
-                existing.mac = mac
             if hostname and not existing.hostname:
                 existing.hostname = hostname
             if hostname and existing.name.startswith("device-"):
                 short = hostname.split(".")[0] if "." in hostname else hostname
                 existing.name = short
-            if ip and not any(dev_ip.ipv4 == ip for dev_ip in existing.ips):
-                dev_ip = models.DeviceIP(device_id=existing.id, ipv4=ip)
+            ip_match = next((dev_ip for dev_ip in existing.ips if dev_ip.ipv4 == ip), None)
+            if ip_match:
+                if mac and not ip_match.mac:
+                    ip_match.mac = mac
+            elif ip:
+                dev_ip = models.DeviceIP(device_id=existing.id, ipv4=ip, mac=mac)
                 auto_assign_network(db, dev_ip)
                 db.add(dev_ip)
         elif mac:
@@ -107,13 +110,12 @@ def _persist(devices: list[dict], db: Session):
             dev = models.Device(
                 name=name,
                 device_type="other",
-                mac=mac,
                 hostname=hostname,
                 discovered=True,
             )
             db.add(dev)
             db.flush()
-            dev_ip = models.DeviceIP(device_id=dev.id, ipv4=ip)
+            dev_ip = models.DeviceIP(device_id=dev.id, ipv4=ip, mac=mac)
             auto_assign_network(db, dev_ip)
             db.add(dev_ip)
     db.commit()

@@ -146,14 +146,14 @@ function buildGraph(data) {
     const edgeColor = e.color?.color || '#94a3b8'
     elements.push({
       data: {
-        id: `edge-${e.from}-${e.to}`,
+        id: `edge-${e.from}-${e.to}-${e.network_id || ''}`,
         source: `dev-${e.from}`,
         target: `dev-${e.to}`,
         label: e.label,
         color: edgeColor,
         network_id: e.network_id,
       },
-      classes: e.dashes ? 'wireless' : undefined,
+      classes: e.edge_type,
     })
   }
 
@@ -227,14 +227,12 @@ function buildGraph(data) {
         style: {
           width: 2.5,
           'line-color': (el) => el.data('color'),
-          'target-arrow-color': (el) => el.data('color'),
-          'target-arrow-shape': 'triangle',
-          'arrow-scale': 1,
+          'target-arrow-shape': 'none',
           'curve-style': 'unbundled-bezier',
           'control-point-distances': (el) => {
-            const sum = el.data('source').split('').reduce((a, c) => a + c.charCodeAt(0), 0) +
-                        el.data('target').split('').reduce((a, c) => a + c.charCodeAt(0), 0)
-            return sum % 2 === 0 ? 25 : -25
+            const id = el.data('id') || ''
+            const sum = id.split('').reduce((a, c) => a + c.charCodeAt(0), 0)
+            return (sum % 2 === 0 ? 1 : -1) * (20 + (Math.abs(sum) % 4) * 15)
           },
           'control-point-weights': 0.5,
           label: (el) => el.data('label'),
@@ -247,9 +245,24 @@ function buildGraph(data) {
         },
       },
       {
+        selector: 'edge.backbone',
+        style: {
+          'line-style': 'dashed',
+          'line-dash-pattern': [10, 8],
+        },
+      },
+      {
+        selector: 'edge.wifi',
+        style: {
+          'line-style': 'dashed',
+          'line-dash-pattern': [3, 18],
+        },
+      },
+      {
         selector: 'edge.wireless',
         style: {
           'line-style': 'dashed',
+          'line-dash-pattern': [3, 18],
         },
       },
     ],
@@ -349,7 +362,14 @@ function applyVisibility() {
     const tgt = edge.target().id()
     const srcHidden = cy.getElementById(src).style('display') === 'none'
     const tgtHidden = cy.getElementById(tgt).style('display') === 'none'
-    edge.style('display', !srcHidden && !tgtHidden ? 'element' : 'none')
+    let visible = !srcHidden && !tgtHidden
+    if (visible && hiddenNet.length > 0) {
+      const netId = edge.data('network_id')
+      if (netId && hiddenNet.includes(netId)) {
+        visible = false
+      }
+    }
+    edge.style('display', visible ? 'element' : 'none')
   })
 
   const hasVisibleChild = node => {
