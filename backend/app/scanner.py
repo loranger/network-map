@@ -5,6 +5,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 
 from . import models
+from .crud import auto_assign_network
 
 IP_RE = re.compile(r'\d+\.\d+\.\d+\.\d+')
 MAC_RE = re.compile(
@@ -97,7 +98,9 @@ def _persist(devices: list[dict], db: Session):
                 short = hostname.split(".")[0] if "." in hostname else hostname
                 existing.name = short
             if ip and not any(dev_ip.ipv4 == ip for dev_ip in existing.ips):
-                db.add(models.DeviceIP(device_id=existing.id, ipv4=ip))
+                dev_ip = models.DeviceIP(device_id=existing.id, ipv4=ip)
+                auto_assign_network(db, dev_ip)
+                db.add(dev_ip)
         elif mac:
             suffix = mac.replace(":", "").lower()
             name = hostname.split(".")[0] if hostname else f"device-{suffix}"
@@ -110,7 +113,9 @@ def _persist(devices: list[dict], db: Session):
             )
             db.add(dev)
             db.flush()
-            db.add(models.DeviceIP(device_id=dev.id, ipv4=ip))
+            dev_ip = models.DeviceIP(device_id=dev.id, ipv4=ip)
+            auto_assign_network(db, dev_ip)
+            db.add(dev_ip)
     db.commit()
 
 

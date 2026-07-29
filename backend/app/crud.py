@@ -1,7 +1,30 @@
+import ipaddress
+
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from . import models, schemas
+
+
+def auto_assign_network(db: Session, device_ip: models.DeviceIP):
+    if device_ip.network_id is not None or not device_ip.ipv4:
+        return
+    networks = db.query(models.Network).filter(
+        models.Network.subnet.isnot(None),
+        models.Network.subnet != "",
+    ).all()
+    try:
+        ip_obj = ipaddress.ip_address(device_ip.ipv4)
+    except ValueError:
+        return
+    for net in networks:
+        try:
+            subnet = ipaddress.ip_network(net.subnet, strict=False)
+        except ValueError:
+            continue
+        if ip_obj in subnet:
+            device_ip.network_id = net.id
+            return
 
 
 # --- Devices ---
@@ -32,7 +55,9 @@ def create_device(db: Session, device: schemas.DeviceCreate):
     for ip_entry in ips_data:
         if ip_entry.get("ipv4") and ip_entry["ipv4"] in existing_ips:
             continue
-        db.add(models.DeviceIP(device_id=db_device.id, **ip_entry))
+        device_ip = models.DeviceIP(device_id=db_device.id, **ip_entry)
+        auto_assign_network(db, device_ip)
+        db.add(device_ip)
         if ip_entry.get("ipv4"):
             existing_ips.add(ip_entry["ipv4"])
     db.commit()
@@ -57,7 +82,9 @@ def update_device(db: Session, device_id: int, device: schemas.DeviceUpdate):
         for ip_entry in ips_data:
             if ip_entry.get("ipv4") and ip_entry["ipv4"] in existing_ips:
                 continue
-            db.add(models.DeviceIP(device_id=device_id, **ip_entry))
+            device_ip = models.DeviceIP(device_id=device_id, **ip_entry)
+            auto_assign_network(db, device_ip)
+            db.add(device_ip)
             if ip_entry.get("ipv4"):
                 existing_ips.add(ip_entry["ipv4"])
     for key, value in data.items():

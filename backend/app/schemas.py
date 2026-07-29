@@ -1,7 +1,8 @@
+import ipaddress
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 
 class SwitchPortBase(BaseModel):
@@ -140,7 +141,15 @@ class NetworkBase(BaseModel):
 
 
 class NetworkCreate(NetworkBase):
-    pass
+    @field_validator("subnet")
+    @classmethod
+    def validate_subnet(cls, v):
+        if v:
+            try:
+                ipaddress.ip_network(v, strict=False)
+            except ValueError as e:
+                raise ValueError(f"Invalid subnet: {e}")
+        return v
 
 
 class NetworkUpdate(BaseModel):
@@ -151,6 +160,16 @@ class NetworkUpdate(BaseModel):
     gateway: Optional[str] = None
     dns: Optional[str] = None
     color: Optional[str] = None
+
+    @field_validator("subnet")
+    @classmethod
+    def validate_subnet(cls, v):
+        if v:
+            try:
+                ipaddress.ip_network(v, strict=False)
+            except ValueError as e:
+                raise ValueError(f"Invalid subnet: {e}")
+        return v
 
 
 class NetworkResponse(NetworkBase):

@@ -434,7 +434,9 @@ def import_arp(data: ArpImportInput, db: Session = Depends(get_db)):
                 short = hostname.split(".")[0] if "." in hostname else hostname
                 existing.name = short
             if ip and not any(dev_ip.ipv4 == ip for dev_ip in existing.ips):
-                db.add(models.DeviceIP(device_id=existing.id, ipv4=ip))
+                dev_ip = models.DeviceIP(device_id=existing.id, ipv4=ip)
+                crud.auto_assign_network(db, dev_ip)
+                db.add(dev_ip)
             updated += 1
         elif mac:
             suffix = mac.replace(":", "").lower()
