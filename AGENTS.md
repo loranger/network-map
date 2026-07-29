@@ -71,17 +71,13 @@ network-map/
 Stocké dans la table `devices`. Représente tout périphérique réseau.
 
 | Champ | Type | Notes |
-|---|---|---|
+|---|---|---|---|
 | id | Integer PK | Auto-incrément |
 | name | String | Nom du périphérique |
 | device_type | String | Enum: computer, iot, switch, ap, router, modem, server, other |
 | manufacturer | String? | Fabricant |
 | model | String? | Modèle |
-| mac | String? | Adresse MAC |
-| ipv4 | String? | Adresse IPv4 |
-| ipv6 | String? | Adresse IPv6 |
 | hostname | String? | Nom DNS court |
-| ip_type | String? | static / dhcp |
 | location_id | Integer FK? | Référence vers locations.id |
 | notes | Text? | Notes libres |
 | admin_url | String? | URL interface d'admin (ex: http://{ip}:2112, le placeholder {ip} est résolu côté frontend) |
@@ -90,7 +86,23 @@ Stocké dans la table `devices`. Représente tout périphérique réseau.
 | created_at | DateTime | Auto |
 | updated_at | DateTime | Auto |
 
-Relations : `location_ref` (Location), `ports` (SwitchPort), `connections_a` (Connection), `connections_b` (Connection)
+Le champ `mac` a été supprimé de `Device` — il est désormais stocké par IP dans `DeviceIP.mac` (voir ci-dessous).
+
+Relations : `location_ref` (Location), `ips` (DeviceIP), `ports` (SwitchPort), `connections_a` (Connection), `connections_b` (Connection), `ap_networks` (Network, via `device_ap_networks`)
+
+### DeviceIP
+Stocké dans la table `device_ips`. Une adresse IP (IPv4) par ligne, avec son adresse MAC et son rattachement réseau. Un device peut avoir plusieurs IPs.
+
+| Champ | Type | Notes |
+|---|---|---|
+| id | Integer PK | Auto-incrément |
+| device_id | Integer FK → devices.id | Périphérique parent (CASCADE) |
+| ipv4 | String? | Adresse IPv4 |
+| mac | String? | Adresse MAC (déplacée ici depuis `devices.mac`) |
+| network_id | Integer FK → networks.id? | Réseau logique (SET NULL) |
+| ip_type | String? | static / dhcp |
+
+Contrainte : index unique sur `ipv4` (évite les doublons à l'import ARP).
 
 ### SwitchPort
 Stocké dans la table `switch_ports`. Ports d'un switch.
@@ -221,6 +233,11 @@ Utilise `Cytoscape.js` avec le layout `fcose`. Les noeuds sont regroupés en **c
 
 Les connexions sans fil (`dashes: true`) sont affichées en pointillés via la classe CSS `edge.wireless`.
 
+Les connexions automatiques client→AP sont déterminées par proximité :
+1. **Même emplacement** (`location_id`) — si un AP partage l'emplacement exact du client
+2. **Même étage** (`floor`) — si aucun AP n'a le même emplacement, on prend un AP au même étage
+3. **Premier AP** — fallback si le client n'a pas d'emplacement
+
 **Bug connu contourné** : avec les compound nodes, passer les éléments et le layout au constructeur Cytoscape fait disparaître les arêtes au rendu initial. Solution : créer l'instance vide, ajouter les éléments via `cy.add()`, puis lancer `layout.run()` séparément.
 
 ### Paramètres du layout fcose
@@ -263,19 +280,6 @@ L'enrichissement (`POST /api/enrich` ou `POST /api/enrich/{id}`) combine :
 Si un hostname est trouvé par reverse DNS **et** que le nom du device commence par `device-`, le nom est automatiquement remplacé par le hostname court (partie avant le premier point).
 
 ## Déploiement
-
-### Règle absolue : tout dans Docker
-
-**Ne jamais exécuter Python, npm, ou tout outil de build/local en dehors de Docker.** Tous les changements (backend, frontend) sont buildés et testés exclusivement via Docker Compose :
-
-```bash
-docker compose build --no-cache backend    # backend uniquement
-docker compose build --no-cache frontend   # frontend uniquement
-docker compose build --no-cache            # les deux
-docker compose down && docker compose up -d
-```
-
-Exception : `bash scan-host.sh` (tourne sur l'hôte macOS car le scan ARP depuis Docker est limité).
 
 ### Docker Compose (production)
 
