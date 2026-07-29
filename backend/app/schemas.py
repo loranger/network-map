@@ -45,38 +45,50 @@ class LocationResponse(LocationBase):
     model_config = {"from_attributes": True}
 
 
+class DeviceIPCreate(BaseModel):
+    ipv4: Optional[str] = None
+    network_id: Optional[int] = None
+    ip_type: Optional[str] = None
+
+
+class DeviceIPResponse(BaseModel):
+    id: int
+    device_id: int
+    ipv4: Optional[str] = None
+    network_id: Optional[int] = None
+    ip_type: Optional[str] = None
+    network_name: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
 class DeviceBase(BaseModel):
     name: str
     device_type: str
     hostname: Optional[str] = None
-    ip_type: Optional[str] = None
     manufacturer: Optional[str] = None
     model: Optional[str] = None
     mac: Optional[str] = None
-    ipv4: Optional[str] = None
-    ipv6: Optional[str] = None
     location_id: Optional[int] = None
     notes: Optional[str] = None
     admin_url: Optional[str] = None
 
 
 class DeviceCreate(DeviceBase):
-    pass
+    ips: list[DeviceIPCreate] = []
 
 
 class DeviceUpdate(BaseModel):
     name: Optional[str] = None
     device_type: Optional[str] = None
     hostname: Optional[str] = None
-    ip_type: Optional[str] = None
     manufacturer: Optional[str] = None
     model: Optional[str] = None
     mac: Optional[str] = None
-    ipv4: Optional[str] = None
-    ipv6: Optional[str] = None
     location_id: Optional[int] = None
     notes: Optional[str] = None
     admin_url: Optional[str] = None
+    ips: Optional[list[DeviceIPCreate]] = None
 
 
 class DeviceResponse(DeviceBase):
@@ -86,6 +98,7 @@ class DeviceResponse(DeviceBase):
     created_at: datetime
     updated_at: datetime
     ports: list[SwitchPortResponse] = []
+    ips: list[DeviceIPResponse] = []
     location_name: Optional[str] = None
     location_floor: Optional[str] = None
 
@@ -99,6 +112,7 @@ class ConnectionBase(BaseModel):
     technology: Optional[str] = None
     speed: Optional[str] = None
     color: Optional[str] = None
+    network_id: Optional[int] = None
     notes: Optional[str] = None
 
 
@@ -110,6 +124,7 @@ class ConnectionResponse(ConnectionBase):
     id: int
     device_a_name: Optional[str] = None
     device_b_name: Optional[str] = None
+    network_name: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
@@ -121,6 +136,7 @@ class NetworkBase(BaseModel):
     subnet: Optional[str] = None
     gateway: Optional[str] = None
     dns: Optional[str] = None
+    color: Optional[str] = None
 
 
 class NetworkCreate(NetworkBase):
@@ -134,6 +150,7 @@ class NetworkUpdate(BaseModel):
     subnet: Optional[str] = None
     gateway: Optional[str] = None
     dns: Optional[str] = None
+    color: Optional[str] = None
 
 
 class NetworkResponse(NetworkBase):

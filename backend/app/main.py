@@ -38,6 +38,30 @@ async def lifespan(app: FastAPI):
         except Exception:
             pass
         try:
+            conn.execute(sql_text("ALTER TABLE connections ADD COLUMN network_id INTEGER REFERENCES networks(id)"))
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            conn.execute(sql_text("""
+                DELETE FROM device_ips WHERE id NOT IN (
+                    SELECT MIN(id) FROM device_ips GROUP BY ipv4
+                )
+            """))
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            conn.execute(sql_text("CREATE UNIQUE INDEX IF NOT EXISTS uq_device_ips_ipv4 ON device_ips(ipv4)"))
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            conn.execute(sql_text("ALTER TABLE networks ADD COLUMN color VARCHAR"))
+            conn.commit()
+        except Exception:
+            pass
+        try:
             conn.execute(sql_text("DROP INDEX IF EXISTS ix_devices_name"))
             conn.commit()
         except Exception:
@@ -106,7 +130,8 @@ def list_devices(
     db: Session = Depends(get_db),
 ):
     query = db.query(models.Device).options(
-        joinedload(models.Device.location_ref)
+        joinedload(models.Device.location_ref),
+        joinedload(models.Device.ips).joinedload(models.DeviceIP.network),
     )
     if type:
         query = query.filter(models.Device.device_type == type)
@@ -116,6 +141,8 @@ def list_devices(
     for d in devices:
         d.location_name = d.location_ref.name if d.location_ref else None
         d.location_floor = d.location_ref.floor if d.location_ref else None
+        for ip in d.ips:
+            ip.network_name = ip.network.name if ip.network else None
         for p in d.ports:
             if p.connected_device:
                 p.connected_device_name = p.connected_device.name
@@ -129,6 +156,8 @@ def get_device(device_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Device not found")
     device.location_name = device.location_ref.name if device.location_ref else None
     device.location_floor = device.location_ref.floor if device.location_ref else None
+    for ip in device.ips:
+        ip.network_name = ip.network.name if ip.network else None
     for p in device.ports:
         if p.connected_device:
             p.connected_device_name = p.connected_device.name
@@ -140,6 +169,8 @@ def create_device(device: schemas.DeviceCreate, db: Session = Depends(get_db)):
     db_device = crud.create_device(db, device)
     db_device.location_name = db_device.location_ref.name if db_device.location_ref else None
     db_device.location_floor = db_device.location_ref.floor if db_device.location_ref else None
+    for ip in db_device.ips:
+        ip.network_name = ip.network.name if ip.network else None
     return db_device
 
 
@@ -152,6 +183,8 @@ def update_device(
         raise HTTPException(status_code=404, detail="Device not found")
     updated.location_name = updated.location_ref.name if updated.location_ref else None
     updated.location_floor = updated.location_ref.floor if updated.location_ref else None
+    for ip in updated.ips:
+        ip.network_name = ip.network.name if ip.network else None
     return updated
 
 
@@ -208,11 +241,14 @@ def delete_port(port_id: int, db: Session = Depends(get_db)):
 
 @app.get("/api/connections", response_model=list[schemas.ConnectionResponse])
 def list_connections(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    conns = crud.get_connections(db, skip, limit)
+    conns = db.query(models.Connection).options(
+        joinedload(models.Connection.network),
+    ).offset(skip).limit(limit).all()
     all_devices = {d.id: d.name for d in db.query(models.Device).all()}
     for c in conns:
         c.device_a_name = all_devices.get(c.device_a_id)
         c.device_b_name = all_devices.get(c.device_b_id)
+        c.network_name = c.network.name if c.network else None
     return conns
 
 
@@ -367,7 +403,7 @@ def import_arp(data: ArpImportInput, db: Session = Depends(get_db)):
             ).first()
         if not existing and ip:
             existing = db.query(models.Device).filter(
-                models.Device.ipv4 == ip
+                models.Device.ips.any(models.DeviceIP.ipv4 == ip)
             ).first()
         if existing:
             existing.last_seen = datetime.utcnow()
@@ -379,6 +415,8 @@ def import_arp(data: ArpImportInput, db: Session = Depends(get_db)):
             if hostname and existing.name.startswith("device-"):
                 short = hostname.split(".")[0] if "." in hostname else hostname
                 existing.name = short
+            if ip and not any(dev_ip.ipv4 == ip for dev_ip in existing.ips):
+                db.add(models.DeviceIP(device_id=existing.id, ipv4=ip))
             updated += 1
         elif mac:
             suffix = mac.replace(":", "").lower()
@@ -387,9 +425,9 @@ def import_arp(data: ArpImportInput, db: Session = Depends(get_db)):
                 name=name,
                 device_type="other",
                 mac=mac,
-                ipv4=ip,
                 hostname=hostname,
                 discovered=True,
+                ips=[schemas.DeviceIPCreate(ipv4=ip)],
             ))
             created += 1
             result = do_enrich(db, new_device)

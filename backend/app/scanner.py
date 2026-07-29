@@ -84,7 +84,7 @@ def _persist(devices: list[dict], db: Session):
             ).first()
         if not existing and ip:
             existing = db.query(models.Device).filter(
-                models.Device.ipv4 == ip
+                models.Device.ips.any(models.DeviceIP.ipv4 == ip)
             ).first()
         if existing:
             existing.last_seen = datetime.utcnow()
@@ -96,17 +96,21 @@ def _persist(devices: list[dict], db: Session):
             if hostname and existing.name.startswith("device-"):
                 short = hostname.split(".")[0] if "." in hostname else hostname
                 existing.name = short
+            if ip and not any(dev_ip.ipv4 == ip for dev_ip in existing.ips):
+                db.add(models.DeviceIP(device_id=existing.id, ipv4=ip))
         elif mac:
             suffix = mac.replace(":", "").lower()
             name = hostname.split(".")[0] if hostname else f"device-{suffix}"
-            db.add(models.Device(
+            dev = models.Device(
                 name=name,
                 device_type="other",
                 mac=mac,
-                ipv4=ip,
                 hostname=hostname,
                 discovered=True,
-            ))
+            )
+            db.add(dev)
+            db.flush()
+            db.add(models.DeviceIP(device_id=dev.id, ipv4=ip))
     db.commit()
 
 

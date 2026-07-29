@@ -157,8 +157,9 @@ def enrich_device(db: Session, device: models.Device) -> dict:
         if mfr:
             device.manufacturer = mfr
             updated["manufacturer"] = mfr
-    if device.ipv4:
-        hn = reverse_dns(device.ipv4) if not device.hostname else device.hostname
+    first_ip = device.ips[0].ipv4 if device.ips else None
+    if first_ip:
+        hn = reverse_dns(first_ip) if not device.hostname else device.hostname
         if hn:
             if not device.hostname:
                 device.hostname = hn

@@ -8,13 +8,25 @@
       </button>
     </div>
 
-    <div class="flex gap-2 mb-4 flex-wrap items-center text-sm">
+    <div class="flex gap-2 mb-2 flex-wrap items-center text-sm">
+      <span class="text-xs opacity-50 mr-1">Types :</span>
       <button v-for="dt in deviceTypes" :key="dt.type"
         class="btn btn-xs gap-1"
         :class="hiddenTypes.includes(dt.type) ? 'btn-outline opacity-40' : 'btn-ghost'"
         @click="toggleType(dt.type)">
         <span class="w-3 h-3 rounded-sm" :style="{ background: dt.color }"></span>
         {{ dt.label }}
+      </button>
+    </div>
+
+    <div v-if="networks.length > 0" class="flex gap-2 mb-4 flex-wrap items-center text-sm">
+      <span class="text-xs opacity-50 mr-1">Réseaux :</span>
+      <button v-for="net in networks" :key="net.id"
+        class="btn btn-xs gap-1"
+        :class="hiddenNetworks.includes(net.id) ? 'btn-outline opacity-40' : 'btn-ghost'"
+        @click="toggleNetwork(net.id)">
+        <span class="w-3 h-3 rounded-sm" :style="{ background: net.color || '#94a3b8' }"></span>
+        {{ net.name }}
       </button>
     </div>
 
@@ -37,6 +49,8 @@ let cy = null
 
 const deviceTypes = ref([])
 const hiddenTypes = ref([])
+const networks = ref([])
+const hiddenNetworks = ref([])
 
 const typeColors = computed(() => {
   const map = {}
@@ -136,6 +150,7 @@ function buildGraph(data) {
         target: `dev-${e.to}`,
         label: e.label,
         color: edgeColor,
+        network_id: e.network_id,
       },
       classes: e.dashes ? 'wireless' : undefined,
     })
@@ -297,6 +312,16 @@ function toggleType(type) {
   applyVisibility()
 }
 
+function toggleNetwork(netId) {
+  const idx = hiddenNetworks.value.indexOf(netId)
+  if (idx >= 0) {
+    hiddenNetworks.value.splice(idx, 1)
+  } else {
+    hiddenNetworks.value.push(netId)
+  }
+  applyVisibility()
+}
+
 function applyVisibility() {
   if (!cy) return
   const allTypes = deviceTypes.value.map(dt => dt.type)
@@ -309,7 +334,9 @@ function applyVisibility() {
   cy.edges().forEach(edge => {
     const src = edge.source().id()
     const tgt = edge.target().id()
-    edge.style('display', visibleIds.has(src) && visibleIds.has(tgt) ? 'element' : 'none')
+    const netId = edge.data('network_id')
+    const netVisible = netId == null || !hiddenNetworks.value.includes(netId)
+    edge.style('display', visibleIds.has(src) && visibleIds.has(tgt) && netVisible ? 'element' : 'none')
   })
 
   const hasVisibleChild = node => {
@@ -361,11 +388,13 @@ function removeOverlaps() {
 }
 
 async function refreshGraph() {
-  const [{ data }, dtRes] = await Promise.all([
+  const [{ data }, dtRes, netRes] = await Promise.all([
     axios.get('/api/graph'),
     axios.get('/api/device-types'),
+    axios.get('/api/networks'),
   ])
   deviceTypes.value = dtRes.data
+  networks.value = netRes.data
   if (cy) {
     cy.destroy()
     cy = null

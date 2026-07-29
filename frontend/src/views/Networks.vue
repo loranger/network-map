@@ -12,6 +12,7 @@
       <div v-for="net in networks" :key="net.id" class="card bg-base-200">
         <div class="card-body">
           <h2 class="card-title">
+            <span v-if="net.color" class="w-3 h-3 rounded-sm" :style="{ backgroundColor: net.color }"></span>
             {{ net.name }}
             <span v-if="net.type === 'mesh'" class="badge badge-accent badge-sm">Mesh</span>
             <span v-else-if="net.type === 'wifi'" class="badge badge-info badge-sm">WiFi</span>
@@ -45,7 +46,7 @@
       </div>
     </div>
 
-    <dialog id="net_modal" class="modal">
+    <dialog ref="netModal" class="modal">
       <div class="modal-box">
         <h3 class="text-lg font-bold mb-4">Ajouter un réseau</h3>
         <form @submit.prevent="addNetwork">
@@ -73,15 +74,22 @@
             <label class="label"><span class="label-text">Passerelle</span></label>
             <input v-model="form.gateway" class="input input-bordered" />
           </div>
+          <div class="form-control mb-3">
+            <label class="label"><span class="label-text">Couleur</span></label>
+            <div class="flex items-center gap-3">
+              <input v-model="form.color" type="color" class="w-10 h-10 rounded cursor-pointer border-0 p-0" />
+              <span class="text-sm font-mono">{{ form.color }}</span>
+            </div>
+          </div>
           <div class="modal-action">
-            <button type="button" class="btn" onclick="net_modal.close()">Annuler</button>
+            <button type="button" class="btn" @click="closeAdd">Annuler</button>
             <button type="submit" class="btn btn-primary">Ajouter</button>
           </div>
         </form>
       </div>
     </dialog>
 
-    <dialog id="edit_net_modal" class="modal">
+    <dialog ref="editNetModal" class="modal">
       <div class="modal-box">
         <h3 class="text-lg font-bold mb-4">Modifier le réseau</h3>
         <form @submit.prevent="updateNetwork">
@@ -109,8 +117,15 @@
             <label class="label"><span class="label-text">Passerelle</span></label>
             <input v-model="editForm.gateway" class="input input-bordered" />
           </div>
+          <div class="form-control mb-3">
+            <label class="label"><span class="label-text">Couleur</span></label>
+            <div class="flex items-center gap-3">
+              <input v-model="editForm.color" type="color" class="w-10 h-10 rounded cursor-pointer border-0 p-0" />
+              <span class="text-sm font-mono">{{ editForm.color }}</span>
+            </div>
+          </div>
           <div class="modal-action">
-            <button type="button" class="btn" onclick="edit_net_modal.close()">Annuler</button>
+            <button type="button" class="btn" @click="closeEdit">Annuler</button>
             <button type="submit" class="btn btn-primary">Enregistrer</button>
           </div>
         </form>
@@ -125,8 +140,18 @@ import axios from 'axios'
 import { Plus, Pencil, Trash2 } from '@lucide/vue'
 
 const networks = ref([])
-const form = ref({ name: '', type: 'wifi', ssid: '', subnet: '', gateway: '' })
-const editForm = ref({ name: '', type: 'wifi', ssid: '', subnet: '', gateway: '' })
+const netModal = ref(null)
+const editNetModal = ref(null)
+
+function randomDarkColor() {
+  const h = Math.floor(Math.random() * 360)
+  const s = 50 + Math.floor(Math.random() * 30)
+  const l = 25 + Math.floor(Math.random() * 25)
+  return `hsl(${h}, ${s}%, ${l}%)`
+}
+
+const form = ref({ name: '', type: 'wifi', ssid: '', subnet: '', gateway: '', color: '' })
+const editForm = ref({ name: '', type: 'wifi', ssid: '', subnet: '', gateway: '', color: '' })
 
 async function fetchNetworks() {
   const { data } = await axios.get('/api/networks')
@@ -134,19 +159,27 @@ async function fetchNetworks() {
 }
 
 function openAdd() {
-  form.value = { name: '', type: 'wifi', ssid: '', subnet: '', gateway: '' }
-  document.getElementById('net_modal').showModal()
+  form.value = { name: '', type: 'wifi', ssid: '', subnet: '', gateway: '', color: randomDarkColor() }
+  netModal.value?.showModal()
+}
+
+function closeAdd() {
+  netModal.value?.close()
 }
 
 async function addNetwork() {
   await axios.post('/api/networks', form.value)
-  document.getElementById('net_modal').close()
+  netModal.value?.close()
   fetchNetworks()
 }
 
 function openEdit(net) {
-  editForm.value = { id: net.id, ...net }
-  document.getElementById('edit_net_modal').showModal()
+  editForm.value = { id: net.id, name: net.name, type: net.type, ssid: net.ssid || '', subnet: net.subnet || '', gateway: net.gateway || '', color: net.color || '' }
+  editNetModal.value?.showModal()
+}
+
+function closeEdit() {
+  editNetModal.value?.close()
 }
 
 async function updateNetwork() {
@@ -156,8 +189,9 @@ async function updateNetwork() {
     ssid: editForm.value.ssid,
     subnet: editForm.value.subnet,
     gateway: editForm.value.gateway,
+    color: editForm.value.color,
   })
-  document.getElementById('edit_net_modal').close()
+  editNetModal.value?.close()
   fetchNetworks()
 }
 

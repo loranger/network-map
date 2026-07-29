@@ -16,6 +16,19 @@ class Location(Base):
     devices = relationship("Device", back_populates="location_ref")
 
 
+class DeviceIP(Base):
+    __tablename__ = "device_ips"
+
+    id = Column(Integer, primary_key=True, index=True)
+    device_id = Column(Integer, ForeignKey("devices.id", ondelete="CASCADE"), nullable=False)
+    ipv4 = Column(String, nullable=True)
+    network_id = Column(Integer, ForeignKey("networks.id", ondelete="SET NULL"), nullable=True)
+    ip_type = Column(String, nullable=True)
+
+    device = relationship("Device", back_populates="ips")
+    network = relationship("Network")
+
+
 class Device(Base):
     __tablename__ = "devices"
 
@@ -25,10 +38,7 @@ class Device(Base):
     manufacturer = Column(String, nullable=True)
     model = Column(String, nullable=True)
     hostname = Column(String, nullable=True)
-    ip_type = Column(String, nullable=True)
     mac = Column(String, nullable=True)
-    ipv4 = Column(String, nullable=True)
-    ipv6 = Column(String, nullable=True)
     location = Column(String, nullable=True)
     floor = Column(String, nullable=True)
     location_id = Column(Integer, ForeignKey("locations.id", ondelete="SET NULL"), nullable=True)
@@ -40,6 +50,8 @@ class Device(Base):
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
     location_ref = relationship("Location", back_populates="devices")
+    ips = relationship("DeviceIP", back_populates="device",
+                       cascade="all, delete-orphan")
     ports = relationship("SwitchPort", back_populates="switch",
                          foreign_keys="SwitchPort.switch_id",
                          cascade="all, delete-orphan")
@@ -77,12 +89,14 @@ class Connection(Base):
     technology = Column(String, nullable=True)
     speed = Column(String, nullable=True)
     color = Column(String, nullable=True)
+    network_id = Column(Integer, ForeignKey("networks.id", ondelete="SET NULL"), nullable=True)
     notes = Column(Text, nullable=True)
 
     device_a = relationship("Device", back_populates="connections_a",
                             foreign_keys=[device_a_id])
     device_b = relationship("Device", back_populates="connections_b",
                             foreign_keys=[device_b_id])
+    network = relationship("Network")
 
 
 class DeviceType(Base):
@@ -104,3 +118,4 @@ class Network(Base):
     subnet = Column(String, nullable=True)
     gateway = Column(String, nullable=True)
     dns = Column(String, nullable=True)
+    color = Column(String, nullable=True)

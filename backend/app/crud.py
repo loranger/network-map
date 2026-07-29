@@ -8,19 +8,33 @@ from . import models, schemas
 
 def get_devices(db: Session, skip: int = 0, limit: int = 100):
     return db.query(models.Device).options(
-        joinedload(models.Device.location_ref)
+        joinedload(models.Device.location_ref),
+        joinedload(models.Device.ips).joinedload(models.DeviceIP.network),
     ).offset(skip).limit(limit).all()
 
 
 def get_device(db: Session, device_id: int):
     return db.query(models.Device).options(
-        joinedload(models.Device.location_ref)
+        joinedload(models.Device.location_ref),
+        joinedload(models.Device.ips).joinedload(models.DeviceIP.network),
     ).filter(models.Device.id == device_id).first()
 
 
 def create_device(db: Session, device: schemas.DeviceCreate):
-    db_device = models.Device(**device.model_dump())
+    data = device.model_dump()
+    ips_data = data.pop("ips", [])
+    db_device = models.Device(**data)
     db.add(db_device)
+    db.flush()
+    existing_ips = set()
+    for row in db.query(models.DeviceIP.ipv4).filter(models.DeviceIP.ipv4.isnot(None)).all():
+        existing_ips.add(row[0])
+    for ip_entry in ips_data:
+        if ip_entry.get("ipv4") and ip_entry["ipv4"] in existing_ips:
+            continue
+        db.add(models.DeviceIP(device_id=db_device.id, **ip_entry))
+        if ip_entry.get("ipv4"):
+            existing_ips.add(ip_entry["ipv4"])
     db.commit()
     db.refresh(db_device)
     return db_device
@@ -28,11 +42,28 @@ def create_device(db: Session, device: schemas.DeviceCreate):
 
 def update_device(db: Session, device_id: int, device: schemas.DeviceUpdate):
     db_device = db.query(models.Device).filter(models.Device.id == device_id).first()
-    if db_device:
-        for key, value in device.model_dump(exclude_unset=True).items():
-            setattr(db_device, key, value)
-        db.commit()
-        db.refresh(db_device)
+    if not db_device:
+        return None
+    data = device.model_dump(exclude_unset=True)
+    ips_data = data.pop("ips", None)
+    if ips_data is not None:
+        existing_ips = set()
+        for row in db.query(models.DeviceIP.ipv4).filter(
+            models.DeviceIP.ipv4.isnot(None),
+            models.DeviceIP.device_id != device_id,
+        ).all():
+            existing_ips.add(row[0])
+        db.query(models.DeviceIP).filter(models.DeviceIP.device_id == device_id).delete()
+        for ip_entry in ips_data:
+            if ip_entry.get("ipv4") and ip_entry["ipv4"] in existing_ips:
+                continue
+            db.add(models.DeviceIP(device_id=device_id, **ip_entry))
+            if ip_entry.get("ipv4"):
+                existing_ips.add(ip_entry["ipv4"])
+    for key, value in data.items():
+        setattr(db_device, key, value)
+    db.commit()
+    db.refresh(db_device)
     return db_device
 
 
@@ -83,6 +114,15 @@ def update_switch_port(db: Session, port_id: int, data: dict):
                 type="wired",
                 technology="Ethernet",
             ))
+        wired = db.query(models.Network).filter(
+            models.Network.type == "wired"
+        ).first()
+        if wired:
+            for ip in db.query(models.DeviceIP).filter(
+                models.DeviceIP.device_id == new_device_id,
+                models.DeviceIP.network_id.is_(None),
+            ).all():
+                ip.network_id = wired.id
     elif old_device_id and not new_device_id:
         db.query(models.Connection).filter(
             (
@@ -243,9 +283,12 @@ def delete_device_type(db: Session, dt_id: int):
 
 def get_graph_data(db: Session) -> schemas.GraphData:
     devices = db.query(models.Device).options(
-        joinedload(models.Device.location_ref)
+        joinedload(models.Device.location_ref),
+        joinedload(models.Device.ips).joinedload(models.DeviceIP.network),
     ).all()
-    connections = db.query(models.Connection).all()
+    connections = db.query(models.Connection).options(
+        joinedload(models.Connection.network),
+    ).all()
 
     type_colors = {}
     for dt in db.query(models.DeviceType).all():
@@ -255,10 +298,11 @@ def get_graph_data(db: Session) -> schemas.GraphData:
     for d in devices:
         loc_name = d.location_ref.name if d.location_ref else None
         loc_floor = d.location_ref.floor if d.location_ref else None
+        first_ip = d.ips[0].ipv4 if d.ips else None
         nodes.append({
             "id": d.id,
             "label": d.name,
-            "title": f"{d.device_type}<br>{d.ipv4 or ''}<br>{loc_name or ''}",
+            "title": f"{d.device_type}<br>{first_ip or ''}<br>{loc_name or ''}",
             "color": type_colors.get(d.device_type, "#6b7280"),
             "shape": "box",
             "group": d.device_type,
@@ -269,13 +313,14 @@ def get_graph_data(db: Session) -> schemas.GraphData:
 
     edges = []
     for c in connections:
-        edge_color = c.color or "#94a3b8"
+        edge_color = c.color or (c.network.color if c.network else None) or "#94a3b8"
         edges.append({
             "from": c.device_a_id,
             "to": c.device_b_id,
             "label": c.technology or c.type,
             "dashes": c.type == "wireless",
             "color": {"color": edge_color},
+            "network_id": c.network_id,
         })
 
     return schemas.GraphData(nodes=nodes, edges=edges)

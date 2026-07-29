@@ -46,10 +46,7 @@
             <th class="hidden md:table-cell cursor-pointer select-none" @click="toggleSort('device_type')">
               Type <span v-if="sortCol === 'device_type'" class="text-xs">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
             </th>
-            <th class="hidden sm:table-cell cursor-pointer select-none" @click="toggleSort('ipv4')">
-              IP <span v-if="sortCol === 'ipv4'" class="text-xs">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
-            </th>
-            <th class="hidden sm:table-cell">Type IP</th>
+            <th class="hidden sm:table-cell">IP</th>
             <th class="hidden lg:table-cell cursor-pointer select-none" @click="toggleSort('mac')">
               MAC <span v-if="sortCol === 'mac'" class="text-xs">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
             </th>
@@ -74,10 +71,11 @@
             <td class="hidden md:table-cell">
               <span class="badge text-white border-0" :style="{ backgroundColor: typeColor(d.device_type) }">{{ typeLabel(d.device_type) }}</span>
             </td>
-            <td class="hidden sm:table-cell font-mono text-sm">{{ d.ipv4 || '-' }}</td>
-            <td class="hidden sm:table-cell text-sm">
-              <span v-if="d.ip_type === 'static'" class="badge badge-outline badge-xs">Static</span>
-              <span v-else-if="d.ip_type === 'dhcp'" class="badge badge-outline badge-xs">DHCP</span>
+            <td class="hidden sm:table-cell font-mono text-sm">
+              <span v-if="d.ips && d.ips.length > 0">
+                {{ d.ips[0].ipv4 }}
+                <span v-if="d.ips.length > 1" class="badge badge-ghost badge-xs ml-1">+{{ d.ips.length - 1 }}</span>
+              </span>
               <span v-else class="opacity-40">-</span>
             </td>
             <td class="hidden lg:table-cell font-mono text-sm">{{ d.mac || '-' }}</td>
@@ -146,7 +144,7 @@
           </div>
           <div class="form-control mb-3">
             <label class="label"><span class="label-text">Adresse IP</span></label>
-            <input v-model="form.ipv4" class="input input-bordered" placeholder="192.168.1.x" />
+            <input v-model="form.ip" class="input input-bordered" placeholder="192.168.1.x" />
           </div>
           <div class="form-control mb-3">
             <label class="label"><span class="label-text">Adresse MAC</span></label>
@@ -184,13 +182,13 @@ const deviceTypes = ref([])
 const filterName = ref('')
 const filterType = ref('')
 const filterLocation = ref('')
-const sortCol = ref('')
+const sortCol = ref('name')
 const sortDir = ref('asc')
 const scanning = ref(false)
 const enriching = ref(false)
 
 const form = ref({
-  name: '', device_type: 'computer', ipv4: '', mac: '', location_id: null, admin_url: '',
+  name: '', device_type: 'computer', ip: '', mac: '', location_id: null, admin_url: '',
 })
 
 const filteredDevices = computed(() => {
@@ -230,8 +228,9 @@ function typeColor(type) {
 
 function resolveAdminUrl(d) {
   if (!d.admin_url) return null
-  if (!d.ipv4) return d.admin_url
-  return d.admin_url.replace(/\{ip\}/g, d.ipv4)
+  const ip = d.ips?.[0]?.ipv4
+  if (!ip) return d.admin_url
+  return d.admin_url.replace(/\{ip\}/g, ip)
 }
 
 function typeLabel(type) {
@@ -255,8 +254,16 @@ async function fetchDeviceTypes() {
 }
 
 async function addDevice() {
-  await axios.post('/api/devices', form.value)
-  form.value = { name: '', device_type: 'computer', ipv4: '', mac: '', location_id: null, admin_url: '' }
+  const payload = {
+    name: form.value.name,
+    device_type: form.value.device_type,
+    mac: form.value.mac,
+    location_id: form.value.location_id,
+    admin_url: form.value.admin_url,
+    ips: form.value.ip ? [{ ipv4: form.value.ip }] : [],
+  }
+  await axios.post('/api/devices', payload)
+  form.value = { name: '', device_type: 'computer', ip: '', mac: '', location_id: null, admin_url: '' }
   document.getElementById('add_modal').close()
   fetchDevices()
 }
