@@ -107,22 +107,26 @@ def update_switch_port(db: Session, port_id: int, data: dict):
                 (models.Connection.device_b_id == port.switch_id)
             )
         ).first()
+        wired = db.query(models.Network).filter(
+            models.Network.type == "wired"
+        ).first()
+        net_id = wired.id if wired else None
         if not existing:
             db.add(models.Connection(
                 device_a_id=port.switch_id,
                 device_b_id=new_device_id,
                 type="wired",
                 technology="Ethernet",
+                network_id=net_id,
             ))
-        wired = db.query(models.Network).filter(
-            models.Network.type == "wired"
-        ).first()
-        if wired:
+        elif net_id and not existing.network_id:
+            existing.network_id = net_id
+        if net_id:
             for ip in db.query(models.DeviceIP).filter(
                 models.DeviceIP.device_id == new_device_id,
                 models.DeviceIP.network_id.is_(None),
             ).all():
-                ip.network_id = wired.id
+                ip.network_id = net_id
     elif old_device_id and not new_device_id:
         db.query(models.Connection).filter(
             (
@@ -299,6 +303,15 @@ def get_graph_data(db: Session) -> schemas.GraphData:
         loc_name = d.location_ref.name if d.location_ref else None
         loc_floor = d.location_ref.floor if d.location_ref else None
         first_ip = d.ips[0].ipv4 if d.ips else None
+        net_ids = list(set(
+            ip.network_id for ip in d.ips if ip.network_id is not None
+        ))
+        if not net_ids and d.device_type == 'switch':
+            wired = db.query(models.Network).filter(
+                models.Network.type == 'wired'
+            ).first()
+            if wired:
+                net_ids = [wired.id]
         nodes.append({
             "id": d.id,
             "label": d.name,
@@ -309,6 +322,7 @@ def get_graph_data(db: Session) -> schemas.GraphData:
             "location": loc_name,
             "floor": loc_floor,
             "location_id": d.location_id,
+            "network_ids": net_ids,
         })
 
     edges = []

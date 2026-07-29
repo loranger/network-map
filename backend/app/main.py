@@ -62,6 +62,24 @@ async def lifespan(app: FastAPI):
         except Exception:
             pass
         try:
+            conn.execute(sql_text("""
+                UPDATE connections SET network_id = (
+                    SELECT id FROM networks WHERE type = 'wired' LIMIT 1
+                ) WHERE type = 'wired' AND network_id IS NULL
+            """))
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            conn.execute(sql_text("""
+                UPDATE device_ips SET network_id = (
+                    SELECT id FROM networks WHERE type = 'wired' LIMIT 1
+                ) WHERE network_id IS NULL AND ipv4 IS NOT NULL
+            """))
+            conn.commit()
+        except Exception:
+            pass
+        try:
             conn.execute(sql_text("DROP INDEX IF EXISTS ix_devices_name"))
             conn.commit()
         except Exception:

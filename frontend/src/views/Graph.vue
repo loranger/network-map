@@ -137,6 +137,7 @@ function buildGraph(data) {
         label: n.label,
         type: n.group || 'other',
         parent: parent,
+        network_ids: n.network_ids || [],
       },
     })
   }
@@ -324,19 +325,31 @@ function toggleNetwork(netId) {
 
 function applyVisibility() {
   if (!cy) return
-  const allTypes = deviceTypes.value.map(dt => dt.type)
-  for (const t of allTypes) {
-    const visible = !hiddenTypes.value.includes(t)
-    cy.nodes(`node:childless[type = "${t}"]`).style('display', visible ? 'element' : 'none')
-  }
-  const visibleNodes = cy.nodes('node:childless').filter(n => n.style('display') !== 'none')
-  const visibleIds = new Set(visibleNodes.map(n => n.id()))
+
+  const hiddenNet = hiddenNetworks.value
+
+  cy.nodes('node:childless').forEach(node => {
+    let visible = true
+    const type = node.data('type')
+    if (hiddenTypes.value.includes(type)) {
+      visible = false
+    }
+    if (visible && hiddenNet.length > 0) {
+      const netIds = node.data('network_ids') || []
+      if (netIds.length > 0) {
+        const anyVisible = netIds.some(nid => !hiddenNet.includes(nid))
+        if (!anyVisible) visible = false
+      }
+    }
+    node.style('display', visible ? 'element' : 'none')
+  })
+
   cy.edges().forEach(edge => {
     const src = edge.source().id()
     const tgt = edge.target().id()
-    const netId = edge.data('network_id')
-    const netVisible = netId == null || !hiddenNetworks.value.includes(netId)
-    edge.style('display', visibleIds.has(src) && visibleIds.has(tgt) && netVisible ? 'element' : 'none')
+    const srcHidden = cy.getElementById(src).style('display') === 'none'
+    const tgtHidden = cy.getElementById(tgt).style('display') === 'none'
+    edge.style('display', !srcHidden && !tgtHidden ? 'element' : 'none')
   })
 
   const hasVisibleChild = node => {
