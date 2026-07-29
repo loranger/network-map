@@ -351,13 +351,15 @@ class ArpImportInput(BaseModel):
 
 @app.post("/api/scan/import")
 def import_arp(data: ArpImportInput, db: Session = Depends(get_db)):
+    from .enricher import enrich_device as do_enrich
     from .scanner import _is_valid_host, _parse_arp_table
     raw = _parse_arp_table(data.raw)
     found = [d for d in raw if _is_valid_host(d.get("ip"))]
     created = 0
     updated = 0
+    enriched = 0
     for d in found:
-        ip, mac = d["ip"], d.get("mac")
+        ip, mac, hostname = d["ip"], d.get("mac"), d.get("hostname")
         existing = None
         if mac:
             existing = db.query(models.Device).filter(
@@ -372,19 +374,29 @@ def import_arp(data: ArpImportInput, db: Session = Depends(get_db)):
             existing.discovered = True
             if mac and not existing.mac:
                 existing.mac = mac
+            if hostname and not existing.hostname:
+                existing.hostname = hostname
+            if hostname and existing.name.startswith("device-"):
+                short = hostname.split(".")[0] if "." in hostname else hostname
+                existing.name = short
             updated += 1
         elif mac:
             suffix = mac.replace(":", "").lower()
-            crud.create_device(db, schemas.DeviceCreate(
-                name=f"device-{suffix}",
+            name = hostname.split(".")[0] if hostname else f"device-{suffix}"
+            new_device = crud.create_device(db, schemas.DeviceCreate(
+                name=name,
                 device_type="other",
                 mac=mac,
                 ipv4=ip,
+                hostname=hostname,
                 discovered=True,
             ))
             created += 1
+            result = do_enrich(db, new_device)
+            if result:
+                enriched += 1
     db.commit()
-    return {"created": created, "updated": updated, "ignored": len(raw) - len(found)}
+    return {"created": created, "updated": updated, "enriched": enriched, "ignored": len(raw) - len(found)}
 
 
 @app.post("/api/enrich")

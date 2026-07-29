@@ -11,6 +11,11 @@ MAC_RE = re.compile(
     r'(([0-9a-fA-F]{2}[:-]){5}[0-9a-fA-F]{2})'
 )
 
+ARP_LINE_RE = re.compile(
+    r'^\s*(?P<hostname>\S+)\s+\((?P<ip>\d+\.\d+\.\d+\.\d+)\)\s+at\s+'
+    r'(?P<mac>(?:[0-9a-fA-F]{2}[:-]){5}[0-9a-fA-F]{2})'
+)
+
 BOGUS_RANGES = [
     re.compile(r'^224\.'),
     re.compile(r'^239\.'),
@@ -49,6 +54,7 @@ def _parse_nmap_output(output: str):
             devices.append({
                 "ip": current_ip,
                 "mac": mm.group(1) if mm else None,
+                "hostname": None,
             })
             current_ip = None
     return devices
@@ -57,19 +63,20 @@ def _parse_nmap_output(output: str):
 def _parse_arp_table(output: str):
     devices = []
     for line in output.strip().splitlines():
-        ip_m = IP_RE.search(line)
-        mac_m = MAC_RE.search(line)
-        if ip_m:
+        m = ARP_LINE_RE.search(line)
+        if m:
+            hostname = m.group("hostname")
             devices.append({
-                "ip": ip_m.group(),
-                "mac": mac_m.group(1) if mac_m else None,
+                "ip": m.group("ip"),
+                "mac": m.group("mac"),
+                "hostname": None if hostname == "?" else hostname,
             })
     return devices
 
 
 def _persist(devices: list[dict], db: Session):
     for d in devices:
-        ip, mac = d["ip"], d.get("mac")
+        ip, mac, hostname = d["ip"], d.get("mac"), d.get("hostname")
         existing = None
         if mac:
             existing = db.query(models.Device).filter(
@@ -84,13 +91,20 @@ def _persist(devices: list[dict], db: Session):
             existing.discovered = True
             if mac and not existing.mac:
                 existing.mac = mac
+            if hostname and not existing.hostname:
+                existing.hostname = hostname
+            if hostname and existing.name.startswith("device-"):
+                short = hostname.split(".")[0] if "." in hostname else hostname
+                existing.name = short
         elif mac:
             suffix = mac.replace(":", "").lower()
+            name = hostname.split(".")[0] if hostname else f"device-{suffix}"
             db.add(models.Device(
-                name=f"device-{suffix}",
+                name=name,
                 device_type="other",
                 mac=mac,
                 ipv4=ip,
+                hostname=hostname,
                 discovered=True,
             ))
     db.commit()
