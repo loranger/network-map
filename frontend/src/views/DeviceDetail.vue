@@ -54,7 +54,7 @@
           <div v-if="device.ips && device.ips.length > 0" class="space-y-1">
             <div v-for="ip in device.ips" :key="ip.id" class="flex items-center gap-2 font-mono text-sm">
               <span>{{ ip.ipv4 }}</span>
-              <span v-if="ip.network_name" class="badge badge-ghost badge-xs">{{ ip.network_name }}</span>
+              <span v-if="ip.network_name" class="badge badge-sm border-0 text-white" :style="{ backgroundColor: networkColor(ip.network_id) }">{{ ip.network_name }}</span>
               <span v-if="ip.ip_type === 'static'" class="badge badge-outline badge-xs">Static</span>
               <span v-else-if="ip.ip_type === 'dhcp'" class="badge badge-outline badge-xs">DHCP</span>
             </div>
@@ -121,7 +121,7 @@
       <div class="modal-box max-w-2xl">
         <h3 class="text-lg font-bold mb-4">Modifier {{ capitalize(device.name) }}</h3>
         <form @submit.prevent="updateDevice">
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
             <div class="form-control">
               <label class="label"><span class="label-text">Nom</span></label>
               <input v-model="editForm.name" class="input input-bordered" required />
@@ -130,13 +130,12 @@
               <label class="label"><span class="label-text">Hostname</span></label>
               <input v-model="editForm.hostname" class="input input-bordered" />
             </div>
-          </div>
-
-          <div class="form-control mb-3">
-            <label class="label"><span class="label-text">Type</span></label>
-            <select v-model="editForm.device_type" class="select select-bordered">
-              <option v-for="dt in deviceTypes" :key="dt.type" :value="dt.type">{{ dt.label }}</option>
-            </select>
+            <div class="form-control">
+              <label class="label"><span class="label-text">Type</span></label>
+              <select v-model="editForm.device_type" class="select select-bordered">
+                <option v-for="dt in deviceTypes" :key="dt.type" :value="dt.type">{{ dt.label }}</option>
+              </select>
+            </div>
           </div>
 
           <label class="label pb-1"><span class="label-text">Adresses IP</span></label>
@@ -337,6 +336,11 @@ function typeColor(type) {
 function typeLabel(type) {
   const found = deviceTypes.value.find(dt => dt.type === type)
   return found ? found.label : type
+}
+
+function networkColor(networkId) {
+  const found = networks.value.find(n => n.id === networkId)
+  return found?.color || '#6b7280'
 }
 
 function navigateTo(id) {
