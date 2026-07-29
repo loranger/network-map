@@ -310,6 +310,7 @@ function buildGraph(data) {
     })
 
     removeOverlaps()
+    arrangeFloorsVertically()
     applyVisibility()
   })
 
@@ -417,6 +418,44 @@ function removeOverlaps() {
       }
     }
     if (!moved) break
+  }
+}
+
+function arrangeFloorsVertically() {
+  const floorNodes = cy.nodes('node.floor')
+  if (floorNodes.length < 2) return
+
+  const floorRank = (id) => {
+    const f = id.replace('floor-', '')
+    const m = f.match(/^R?\+?(\d+)$/i)
+    if (m) return parseInt(m[1])
+    if (f.toUpperCase() === 'RDC') return 0
+    return 999
+  }
+
+  const sorted = floorNodes.sort((a, b) => floorRank(a.id()) - floorRank(b.id()))
+
+  const clusterBB = cy.nodes('node.floor').boundingBox()
+  const clusterCenterY = (clusterBB.y1 + clusterBB.y2) / 2
+  const spacing = 100
+
+  const heights = sorted.map(f => f.boundingBox().y2 - f.boundingBox().y1)
+  const totalTargetHeight = heights.reduce((s, h) => s + h, 0) + spacing * (sorted.length - 1)
+  let y = clusterCenterY - totalTargetHeight / 2
+
+  for (let i = 0; i < sorted.length; i++) {
+    const f = sorted[i]
+    const bb = f.boundingBox()
+    const h = bb.y2 - bb.y1
+    const targetCenterY = y + h / 2
+    const currentCenterY = (bb.y1 + bb.y2) / 2
+    const deltaY = targetCenterY - currentCenterY
+
+    f.descendants().filter(n => n.isChildless()).forEach(n => {
+      const pos = n.position()
+      n.position({ x: pos.x, y: pos.y + deltaY })
+    })
+    y += h + spacing
   }
 }
 
