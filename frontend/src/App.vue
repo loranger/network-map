@@ -18,7 +18,7 @@
     </div>
     <div class="drawer-side z-40">
       <label for="drawer-toggle" class="drawer-overlay"></label>
-      <aside class="bg-base-200 min-h-full w-64 p-4 border-r border-base-300">
+      <aside class="bg-base-200 min-h-full w-64 p-4 border-r border-base-300 flex flex-col">
         <div class="hidden lg:block text-2xl font-bold mb-8 mt-2">Network Map</div>
         <ul class="menu menu-md gap-1">
           <li>
@@ -68,11 +68,62 @@
             </details>
           </li>
         </ul>
+        <div class="mt-auto border-t border-base-300 pt-3">
+          <button class="btn btn-ghost btn-sm w-full justify-start gap-3" @click="toggleTheme">
+            <component :is="themeIcon" :size="18" :stroke-width="2" />
+            {{ themeLabel }}
+          </button>
+        </div>
       </aside>
     </div>
   </div>
 </template>
 
 <script setup>
-import { Menu, Monitor, Network, Wifi, MapPin, Shapes, Settings, Layers } from '@lucide/vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { Menu, Monitor, Network, Wifi, MapPin, Shapes, Settings, Layers, Sun, Moon } from '@lucide/vue'
+
+const theme = ref('system')
+
+function applyTheme(t) {
+  const el = document.documentElement
+  if (t === 'system') {
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+    el.setAttribute('data-theme', prefersDark ? 'dark' : 'light')
+  } else {
+    el.setAttribute('data-theme', t)
+  }
+  localStorage.setItem('theme', t)
+}
+
+function toggleTheme() {
+  const order = ['light', 'dark', 'system']
+  const idx = order.indexOf(theme.value)
+  theme.value = order[(idx + 1) % order.length]
+}
+
+const themeIcon = computed(() => {
+  if (theme.value === 'dark') return Moon
+  if (theme.value === 'system') {
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+    return prefersDark ? Moon : Sun
+  }
+  return Sun
+})
+
+const themeLabel = computed(() => {
+  if (theme.value === 'dark') return 'Sombre'
+  if (theme.value === 'system') return 'Auto'
+  return 'Clair'
+})
+
+onMounted(() => {
+  theme.value = localStorage.getItem('theme') || 'system'
+  applyTheme(theme.value)
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    if (theme.value === 'system') applyTheme('system')
+  })
+})
+
+watch(theme, applyTheme)
 </script>
