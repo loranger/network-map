@@ -115,7 +115,7 @@
     </div>
 
     <dialog ref="editModal" class="modal">
-      <div class="modal-box max-w-2xl">
+      <div class="modal-box max-w-4xl">
         <h3 class="text-lg font-bold mb-4">Modifier {{ capitalize(device.name) }}</h3>
         <form @submit.prevent="updateDevice">
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
