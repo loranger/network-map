@@ -195,6 +195,11 @@
             <textarea v-model="editForm.notes" class="textarea textarea-bordered" rows="3"></textarea>
           </div>
 
+          <div class="form-control mb-3">
+            <label class="label"><span class="label-text">Icône</span></label>
+            <IconPicker v-model="editForm.icon" />
+          </div>
+
           <div class="modal-action">
             <button type="button" class="btn btn-outline" @click="enrichDevice" :disabled="enriching">
               <Info v-if="!enriching" :size="16" :stroke-width="2" />
@@ -263,6 +268,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
 import { ArrowLeft, Plus, Link2, Trash2, Pencil, Info, X } from '@lucide/vue'
+import IconPicker from '../components/IconPicker.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -351,6 +357,7 @@ function openEditModal() {
     model: device.value.model || '',
     notes: device.value.notes || '',
     admin_url: device.value.admin_url || '',
+    icon: device.value.icon || null,
     location_id: device.value.location_id,
     ips: (device.value.ips || []).map(ip => ({
       ipv4: ip.ipv4 || '',
