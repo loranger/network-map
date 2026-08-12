@@ -270,10 +270,64 @@ def update_network(db: Session, network_id: int, net: schemas.NetworkUpdate):
     return db_net
 
 
+# --- Floors ---
+
+def get_floors(db: Session):
+    return db.query(models.Floor).order_by(func.lower(models.Floor.name)).all()
+
+
+def get_default_floor(db: Session):
+    return db.query(models.Floor).filter(models.Floor.is_default == True).first()
+
+
+def create_floor(db: Session, floor: schemas.FloorCreate):
+    if floor.is_default:
+        _clear_default_floor(db)
+    db_floor = models.Floor(**floor.model_dump())
+    db.add(db_floor)
+    db.commit()
+    db.refresh(db_floor)
+    return db_floor
+
+
+def update_floor(db: Session, floor_id: int, floor: schemas.FloorUpdate):
+    db_floor = db.query(models.Floor).filter(models.Floor.id == floor_id).first()
+    if db_floor:
+        data = floor.model_dump(exclude_unset=True)
+        if data.get("is_default"):
+            _clear_default_floor(db)
+        for key, value in data.items():
+            setattr(db_floor, key, value)
+        db.commit()
+        db.refresh(db_floor)
+    return db_floor
+
+
+def delete_floor(db: Session, floor_id: int):
+    db_floor = db.query(models.Floor).filter(models.Floor.id == floor_id).first()
+    if db_floor:
+        db_floor.is_default = False
+        db.query(models.Location).filter(
+            models.Location.floor_id == floor_id
+        ).update({"floor_id": None})
+        db.delete(db_floor)
+        db.commit()
+    return db_floor
+
+
+def _clear_default_floor(db: Session):
+    db.query(models.Floor).filter(models.Floor.is_default == True).update(
+        {"is_default": False}
+    )
+    db.commit()
+
+
 # --- Locations ---
 
 def get_locations(db: Session):
-    return db.query(models.Location).order_by(func.lower(models.Location.name)).all()
+    return db.query(models.Location).options(
+        joinedload(models.Location.floor_ref)
+    ).order_by(func.lower(models.Location.name)).all()
 
 
 def create_location(db: Session, loc: schemas.LocationCreate):
@@ -342,6 +396,8 @@ def get_graph_data(db: Session) -> schemas.GraphData:
         joinedload(models.Device.ips).joinedload(models.DeviceIP.network),
         joinedload(models.Device.ap_networks),
     ).all()
+    devices = [d for d in devices if d.online]
+    visible_ids = {d.id for d in devices}
     connections = db.query(models.Connection).options(
         joinedload(models.Connection.network),
     ).all()
@@ -354,7 +410,7 @@ def get_graph_data(db: Session) -> schemas.GraphData:
     nodes = []
     for d in devices:
         loc_name = d.location_ref.name if d.location_ref else None
-        loc_floor = d.location_ref.floor if d.location_ref else None
+        loc_floor = d.location_ref.floor_ref.name if (d.location_ref and d.location_ref.floor_ref) else None
         first_ip = d.ips[0].ipv4 if d.ips else None
         net_ids = list(set(
             ip.network_id for ip in d.ips if ip.network_id is not None
@@ -382,11 +438,15 @@ def get_graph_data(db: Session) -> schemas.GraphData:
 
     manual_pairs = set()
     for c in connections:
+        if c.device_a_id not in visible_ids or c.device_b_id not in visible_ids:
+            continue
         manual_pairs.add((c.device_a_id, c.device_b_id))
         manual_pairs.add((c.device_b_id, c.device_a_id))
 
     edges = []
     for c in connections:
+        if c.device_a_id not in visible_ids or c.device_b_id not in visible_ids:
+            continue
         edge_color = c.color or (c.network.color if c.network else None) or "#94a3b8"
         edges.append({
             "from": c.device_a_id,
@@ -442,11 +502,11 @@ def get_graph_data(db: Session) -> schemas.GraphData:
                 d = device_map.get(aid)
                 if d:
                     ap_loc_map[aid] = d.location_id
-                    ap_floor_map[aid] = d.location_ref.floor if d.location_ref else None
+                    ap_floor_map[aid] = d.location_ref.floor_ref.name if (d.location_ref and d.location_ref.floor_ref) else None
             for cid in client_ids:
                 cd = device_map.get(cid)
                 client_loc = cd.location_id if cd else None
-                client_floor = cd.location_ref.floor if (cd and cd.location_ref) else None
+                client_floor = cd.location_ref.floor_ref.name if (cd and cd.location_ref and cd.location_ref.floor_ref) else None
                 target_ap = None
                 for aid, loc in ap_loc_map.items():
                     if loc is not None and loc == client_loc:
@@ -457,6 +517,13 @@ def get_graph_data(db: Session) -> schemas.GraphData:
                         if floor is not None and floor == client_floor:
                             target_ap = aid
                             break
+                if target_ap is None:
+                    default_floor = db.query(models.Floor).filter(models.Floor.is_default == True).first()
+                    if default_floor:
+                        for aid, floor in ap_floor_map.items():
+                            if floor == default_floor.name:
+                                target_ap = aid
+                                break
                 if target_ap is None:
                     target_ap = ap_ids[0]
                 pair = (cid, target_ap)

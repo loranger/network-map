@@ -1,3 +1,6 @@
+import asyncio
+import contextlib
+import os
 from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Optional
@@ -10,6 +13,30 @@ from sqlalchemy.orm import Session, joinedload
 
 from . import crud, models, schemas
 from .database import Base, engine, get_db
+
+
+def _background_scan():
+    try:
+        from .scanner import scan_network
+        with Session(engine) as db:
+            found = scan_network(db=db)
+            print(f"Periodic scan: {len(found)} device(s) found")
+    except Exception as e:
+        print(f"Periodic scan error: {e}")
+
+
+async def periodic_scan_loop():
+    minutes = int(os.environ.get("SCAN_INTERVAL_MINUTES", "15") or 0)
+    if minutes <= 0:
+        return
+    loop = asyncio.get_running_loop()
+    lock = asyncio.Lock()
+    while True:
+        await asyncio.sleep(minutes * 60)
+        if lock.locked():
+            continue
+        async with lock:
+            await loop.run_in_executor(None, _background_scan)
 
 
 @asynccontextmanager
@@ -146,18 +173,62 @@ async def lifespan(app: FastAPI):
         except Exception:
             pass
     with Session(engine) as session:
+        # --- Add floor_id column to locations if missing ---
+        try:
+            session.execute(sql_text("SELECT floor_id FROM locations LIMIT 1"))
+        except Exception:
+            try:
+                session.execute(sql_text("ALTER TABLE locations ADD COLUMN floor_id INTEGER REFERENCES floors(id)"))
+                session.commit()
+            except Exception:
+                pass
+
+        # --- Floor migration (string → FK) ---
+        has_floor_column = False
+        try:
+            session.execute(sql_text("SELECT floor FROM locations LIMIT 1"))
+            has_floor_column = True
+        except Exception:
+            pass
+        if has_floor_column:
+            rows = session.execute(
+                sql_text("SELECT DISTINCT floor FROM locations WHERE floor IS NOT NULL")
+            ).all()
+            floor_map = {}
+            for (floor_name,) in rows:
+                existing = session.query(models.Floor).filter(
+                    models.Floor.name == floor_name
+                ).first()
+                if not existing:
+                    existing = models.Floor(name=floor_name, is_default=False)
+                    session.add(existing)
+                    session.flush()
+                floor_map[floor_name] = existing.id
+            loc_rows = session.execute(
+                sql_text("SELECT id, floor FROM locations WHERE floor IS NOT NULL")
+            ).all()
+            for loc_id, floor_name in loc_rows:
+                fid = floor_map.get(floor_name)
+                if fid is not None:
+                    session.execute(
+                        sql_text("UPDATE locations SET floor_id = :fid WHERE id = :id"),
+                        {"fid": fid, "id": loc_id}
+                    )
+            session.commit()
+            try:
+                session.execute(sql_text("ALTER TABLE locations DROP COLUMN floor"))
+                session.commit()
+            except Exception:
+                pass
+
+        # --- Seed initial locations from legacy devices ---
         existing = session.query(models.Location).count()
         if existing == 0:
             rows = session.execute(
                 sql_text("SELECT DISTINCT location FROM devices WHERE location IS NOT NULL")
             ).all()
             for (location,) in rows:
-                floor_row = session.execute(
-                    sql_text("SELECT floor FROM devices WHERE location = :loc AND floor IS NOT NULL LIMIT 1"),
-                    {"loc": location}
-                ).first()
-                floor = floor_row[0] if floor_row else None
-                session.add(models.Location(name=location, floor=floor))
+                session.add(models.Location(name=location))
             session.commit()
             loc_map = {}
             for loc in session.query(models.Location).all():
@@ -167,6 +238,12 @@ async def lifespan(app: FastAPI):
                 if loc:
                     device.location_id = loc.id
             session.commit()
+
+        # --- Seed default floor if none exists ---
+        if session.query(models.Floor).count() == 0:
+            session.add(models.Floor(name="R+1", is_default=True))
+            session.commit()
+
         if session.query(models.DeviceType).count() == 0:
             defaults = [
                 models.DeviceType(type="router", label="Routeur", color="#3b82f6"),
@@ -181,7 +258,11 @@ async def lifespan(app: FastAPI):
             for dt in defaults:
                 session.add(dt)
             session.commit()
+    scan_task = asyncio.create_task(periodic_scan_loop())
     yield
+    scan_task.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await scan_task
 
 
 app = FastAPI(title="Network Map API", lifespan=lifespan)
@@ -214,7 +295,7 @@ def list_devices(
     devices = query.offset(skip).limit(limit).all()
     for d in devices:
         d.location_name = d.location_ref.name if d.location_ref else None
-        d.location_floor = d.location_ref.floor if d.location_ref else None
+        d.location_floor = d.location_ref.floor_ref.name if (d.location_ref and d.location_ref.floor_ref) else None
         for ip in d.ips:
             ip.network_name = ip.network.name if ip.network else None
         for p in d.ports:
@@ -229,7 +310,7 @@ def get_device(device_id: int, db: Session = Depends(get_db)):
     if not device:
         raise HTTPException(status_code=404, detail="Device not found")
     device.location_name = device.location_ref.name if device.location_ref else None
-    device.location_floor = device.location_ref.floor if device.location_ref else None
+    device.location_floor = device.location_ref.floor_ref.name if (device.location_ref and device.location_ref.floor_ref) else None
     for ip in device.ips:
         ip.network_name = ip.network.name if ip.network else None
     for p in device.ports:
@@ -242,7 +323,7 @@ def get_device(device_id: int, db: Session = Depends(get_db)):
 def create_device(device: schemas.DeviceCreate, db: Session = Depends(get_db)):
     db_device = crud.create_device(db, device)
     db_device.location_name = db_device.location_ref.name if db_device.location_ref else None
-    db_device.location_floor = db_device.location_ref.floor if db_device.location_ref else None
+    db_device.location_floor = db_device.location_ref.floor_ref.name if (db_device.location_ref and db_device.location_ref.floor_ref) else None
     for ip in db_device.ips:
         ip.network_name = ip.network.name if ip.network else None
     return db_device
@@ -256,7 +337,7 @@ def update_device(
     if not updated:
         raise HTTPException(status_code=404, detail="Device not found")
     updated.location_name = updated.location_ref.name if updated.location_ref else None
-    updated.location_floor = updated.location_ref.floor if updated.location_ref else None
+    updated.location_floor = updated.location_ref.floor_ref.name if (updated.location_ref and updated.location_ref.floor_ref) else None
     for ip in updated.ips:
         ip.network_name = ip.network.name if ip.network else None
     return updated
@@ -351,20 +432,58 @@ def delete_connection(conn_id: int, db: Session = Depends(get_db)):
     return {"ok": True}
 
 
+# --- Floors ---
+
+@app.get("/api/floors", response_model=list[schemas.FloorResponse])
+def list_floors(db: Session = Depends(get_db)):
+    return crud.get_floors(db)
+
+
+@app.post("/api/floors", response_model=schemas.FloorResponse)
+def create_floor(floor: schemas.FloorCreate, db: Session = Depends(get_db)):
+    existing = db.query(models.Floor).filter(models.Floor.name == floor.name).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Floor already exists")
+    return crud.create_floor(db, floor)
+
+
+@app.put("/api/floors/{floor_id}", response_model=schemas.FloorResponse)
+def update_floor(floor_id: int, floor: schemas.FloorUpdate, db: Session = Depends(get_db)):
+    updated = crud.update_floor(db, floor_id, floor)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Floor not found")
+    return updated
+
+
+@app.delete("/api/floors/{floor_id}")
+def delete_floor(floor_id: int, db: Session = Depends(get_db)):
+    deleted = crud.delete_floor(db, floor_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Floor not found")
+    return {"ok": True}
+
+
+# --- Locations ---
+
 @app.get("/api/locations", response_model=list[schemas.LocationResponse])
 def list_locations(db: Session = Depends(get_db)):
-    return crud.get_locations(db)
+    locs = crud.get_locations(db)
+    for loc in locs:
+        loc.floor_name = loc.floor_ref.name if loc.floor_ref else None
+    return locs
 
 
 @app.post("/api/locations", response_model=schemas.LocationResponse)
 def create_location(loc: schemas.LocationCreate, db: Session = Depends(get_db)):
     existing = db.query(models.Location).filter(
         models.Location.name == loc.name,
-        models.Location.floor == loc.floor,
+        models.Location.floor_id == loc.floor_id,
     ).first()
     if existing:
         raise HTTPException(status_code=400, detail="Location already exists")
-    return crud.create_location(db, loc)
+    db_loc = crud.create_location(db, loc)
+    db_loc.floor_name = db_loc.floor_ref.name if db_loc.floor_ref else None
+    return db_loc
 
 
 @app.delete("/api/locations/{loc_id}")
@@ -380,6 +499,7 @@ def update_location(loc_id: int, loc: schemas.LocationUpdate, db: Session = Depe
     updated = crud.update_location(db, loc_id, loc)
     if not updated:
         raise HTTPException(status_code=404, detail="Location not found")
+    updated.floor_name = updated.floor_ref.name if (updated and updated.floor_ref) else None
     return updated
 
 
@@ -444,10 +564,14 @@ def update_network(network_id: int, net: schemas.NetworkUpdate, db: Session = De
     return updated
 
 
+class ScanInput(BaseModel):
+    subnet: Optional[str] = None
+
+
 @app.post("/api/scan")
-def scan(db: Session = Depends(get_db)):
+def scan(data: Optional[ScanInput] = None, db: Session = Depends(get_db)):
     from .scanner import scan_network
-    found = scan_network(db=db)
+    found = scan_network(subnet=data.subnet if data else None, db=db)
     return {
         "found": len(found),
         "devices": found,
@@ -462,56 +586,69 @@ class ArpImportInput(BaseModel):
 @app.post("/api/scan/import")
 def import_arp(data: ArpImportInput, db: Session = Depends(get_db)):
     from .enricher import enrich_device as do_enrich
-    from .scanner import _is_valid_host, _parse_arp_table
+    from .scanner import PERSIST_LOCK, _is_valid_host, _parse_arp_table
     raw = _parse_arp_table(data.raw)
     found = [d for d in raw if _is_valid_host(d.get("ip"))]
+    unique = []
+    seen_ips = set()
+    for d in found:
+        if d["ip"] in seen_ips:
+            continue
+        seen_ips.add(d["ip"])
+        unique.append(d)
+    found = unique
     created = 0
     updated = 0
     enriched = 0
-    for d in found:
-        ip, mac, hostname = d["ip"], d.get("mac"), d.get("hostname")
-        existing = None
-        if mac:
-            ip_entry = db.query(models.DeviceIP).filter(
-                models.DeviceIP.mac == mac
-            ).first()
-            existing = ip_entry.device if ip_entry else None
-        if not existing and ip:
-            existing = db.query(models.Device).filter(
-                models.Device.ips.any(models.DeviceIP.ipv4 == ip)
-            ).first()
-        if existing:
-            existing.last_seen = datetime.utcnow()
-            existing.discovered = True
-            if hostname and not existing.hostname:
-                existing.hostname = hostname
-            if hostname and existing.name.startswith("device-"):
-                short = hostname.split(".")[0] if "." in hostname else hostname
-                existing.name = short
-            ip_match = next((dev_ip for dev_ip in existing.ips if dev_ip.ipv4 == ip), None)
-            if ip_match:
-                if mac and not ip_match.mac:
-                    ip_match.mac = mac
-            elif ip:
-                dev_ip = models.DeviceIP(device_id=existing.id, ipv4=ip, mac=mac)
-                crud.auto_assign_network(db, dev_ip)
-                db.add(dev_ip)
-            updated += 1
-        elif mac:
-            suffix = mac.replace(":", "").lower()
-            name = hostname.split(".")[0] if hostname else f"device-{suffix}"
-            new_device = crud.create_device(db, schemas.DeviceCreate(
-                name=name,
-                device_type="other",
-                hostname=hostname,
-                discovered=True,
-                ips=[schemas.DeviceIPCreate(ipv4=ip, mac=mac)],
-            ))
-            created += 1
-            result = do_enrich(db, new_device)
-            if result:
-                enriched += 1
-    db.commit()
+    with PERSIST_LOCK:
+        for d in found:
+            ip, mac, hostname = d["ip"], d.get("mac"), d.get("hostname")
+            existing = None
+            if mac:
+                ip_entry = db.query(models.DeviceIP).filter(
+                    models.DeviceIP.mac == mac
+                ).first()
+                existing = ip_entry.device if ip_entry else None
+            if not existing and ip:
+                existing = db.query(models.Device).filter(
+                    models.Device.ips.any(models.DeviceIP.ipv4 == ip)
+                ).first()
+            if existing:
+                existing.last_seen = datetime.utcnow()
+                existing.discovered = True
+                if hostname and not existing.hostname:
+                    existing.hostname = hostname
+                if hostname and existing.name.startswith("device-"):
+                    short = hostname.split(".")[0] if "." in hostname else hostname
+                    existing.name = short
+                ip_match = next((dev_ip for dev_ip in existing.ips if dev_ip.ipv4 == ip), None)
+                if ip_match:
+                    if mac and not ip_match.mac:
+                        ip_match.mac = mac
+                elif ip:
+                    owner = db.query(models.DeviceIP).filter(
+                        models.DeviceIP.ipv4 == ip
+                    ).first()
+                    if owner is None:
+                        dev_ip = models.DeviceIP(device_id=existing.id, ipv4=ip, mac=mac)
+                        crud.auto_assign_network(db, dev_ip)
+                        db.add(dev_ip)
+                updated += 1
+            elif mac:
+                suffix = mac.replace(":", "").lower()
+                name = hostname.split(".")[0] if hostname else f"device-{suffix}"
+                new_device = crud.create_device(db, schemas.DeviceCreate(
+                    name=name,
+                    device_type="other",
+                    hostname=hostname,
+                    discovered=True,
+                    ips=[schemas.DeviceIPCreate(ipv4=ip, mac=mac)],
+                ))
+                created += 1
+                result = do_enrich(db, new_device)
+                if result:
+                    enriched += 1
+        db.commit()
     return {"created": created, "updated": updated, "enriched": enriched, "ignored": len(raw) - len(found)}
 
 
@@ -530,7 +667,7 @@ def enrich_device(device_id: int, db: Session = Depends(get_db)):
     updated = do_enrich(db, device)
     db.refresh(device)
     device.location_name = device.location_ref.name if device.location_ref else None
-    device.location_floor = device.location_ref.floor if device.location_ref else None
+    device.location_floor = device.location_ref.floor_ref.name if (device.location_ref and device.location_ref.floor_ref) else None
     for ip in device.ips:
         ip.network_name = ip.network.name if ip.network else None
     for p in device.ports:

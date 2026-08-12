@@ -175,7 +175,7 @@
             <label class="label"><span class="label-text">Emplacement</span></label>
             <select v-model="editForm.location_id" class="select select-bordered">
               <option :value="null">- Aucun -</option>
-              <option v-for="loc in locations" :key="loc.id" :value="loc.id">{{ capitalize(loc.name) }} ({{ loc.floor || '?' }})</option>
+              <option v-for="loc in locations" :key="loc.id" :value="loc.id">{{ capitalize(loc.name) }} ({{ loc.floor_name || '?' }})</option>
             </select>
           </div>
 

@@ -32,12 +32,13 @@ network-map/
 │       ├── main.js          # Bootstrap Vue Router (hash history)
 │       ├── App.vue          # Layout principal (drawer sidebar responsive)
 │       ├── style.css        # Tailwind + styles graph-container
-│       └── views/
+│   └── views/
 │           ├── Devices.vue      # Liste CRUD + scan réseau + import ARP + enrichissement + tri colonnes
 │           ├── DeviceDetail.vue # Détail, ports switch (triés, nuancier couleur), connexions, enrich unitaire
 │           ├── Graph.vue        # Cartographie Cytoscape.js (compound nodes 3 niveaux + fcose + légende interactive + anti-overlap)
 │           ├── Networks.vue     # Gestion réseaux (CRUD + édition)
-│           ├── Locations.vue    # Gestion emplacements (CRUD)
+│           ├── Locations.vue    # Gestion emplacements (CRUD, liés à un étage)
+│           ├── Floors.vue       # Gestion étages (CRUD, avec défaut)
 │           └── DeviceTypes.vue  # Gestion types (CRUD, couleur aléatoire sombre)
 ├── devices.yaml       # Données initiales (périphériques) — conservé comme référence
 ├── networks.yaml      # Données initiales (réseaux) — conservé comme référence
@@ -144,6 +145,18 @@ Stocké dans la table `networks`. Réseau logique (WiFi, Mesh, filaire).
 | gateway | String? | Passerelle |
 | dns | String? | DNS |
 
+### Floor
+Stocké dans la table `floors`. Étage d'un emplacement physique, avec un flag `is_default` utilisé pour la connexion automatique des clients WiFi sans emplacement.
+
+| Champ | Type | Notes |
+|---|---|---|
+| id | Integer PK | Auto-incrément |
+| name | String | Nom de l'étage (unique) |
+| is_default | Boolean | Étage par défaut (un seul à la fois) |
+| created_at | DateTime | Auto |
+
+Relations : `locations` (Location)
+
 ### Location
 Stocké dans la table `locations`. Emplacement physique avec étage.
 
@@ -151,10 +164,10 @@ Stocké dans la table `locations`. Emplacement physique avec étage.
 |---|---|---|
 | id | Integer PK | Auto-incrément |
 | name | String | Nom de l'emplacement |
-| floor | String? | Étage (RDC, 1er, etc.) |
+| floor_id | Integer FK? | Référence vers floors.id |
 | created_at | DateTime | Auto |
 
-Relations : `devices` (Device)
+Relations : `floor_ref` (Floor), `devices` (Device)
 
 Le champ `location_id` (FK → locations.id) est présent sur `Device`. La hiérarchie dans le graphe est : Étage (floor) > Emplacement (location) > Périphérique (device).
 
@@ -210,6 +223,14 @@ Toutes les routes sont préfixées par `/api`.
 | PUT | /api/locations/{id} | Modification |
 | DELETE | /api/locations/{id} | Suppression |
 
+### Floors
+| Méthode | Route | Description |
+|---|---|---|
+| GET | /api/floors | Liste |
+| POST | /api/floors | Création |
+| PUT | /api/floors/{id} | Modification |
+| DELETE | /api/floors/{id} | Suppression |
+
 ### DeviceTypes
 | Méthode | Route | Description |
 |---|---|---|
@@ -236,7 +257,8 @@ Les connexions sans fil (`dashes: true`) sont affichées en pointillés via la c
 Les connexions automatiques client→AP sont déterminées par proximité :
 1. **Même emplacement** (`location_id`) — si un AP partage l'emplacement exact du client
 2. **Même étage** (`floor`) — si aucun AP n'a le même emplacement, on prend un AP au même étage
-3. **Premier AP** — fallback si le client n'a pas d'emplacement
+3. **Étage par défaut** — si le client n'a pas d'emplacement, on utilise l'étage marqué `is_default` dans la table `floors`
+4. **Premier AP** — fallback si rien ne correspond
 
 **Bug connu contourné** : avec les compound nodes, passer les éléments et le layout au constructeur Cytoscape fait disparaître les arêtes au rendu initial. Solution : créer l'instance vide, ajouter les éléments via `cy.add()`, puis lancer `layout.run()` séparément.
 
@@ -260,6 +282,22 @@ Les connexions automatiques client→AP sont déterminées par proximité :
 Le scanner combine deux méthodes :
 1. **nmap -sn -PR** (ARP ping) — nécessite `privileged: true` + Docker Desktop "Host Networking" activé
 2. **arp -a** — fallback si nmap ne trouve rien
+
+Le sous-réseau par défaut est `192.168.1.0/24`, mais il est configurable :
+- Via la variable d'env `SCAN_SUBNET` dans `docker-compose.yml` (`SCAN_SUBNET=${SCAN_SUBNET:-192.168.1.0/24}`)
+- Via le champ "Sous-réseau" du bouton Scanner dans la vue Périphériques, envoyé dans le body de `POST /api/scan` (`{"subnet": "..."}`)
+
+Des sous-réseaux entiers peuvent être exclus de la découverte via `SCAN_EXCLUDE_SUBNETS` (liste comma-séparée de CIDR, ex: `172.30.0.0/16,192.168.139.0/24`). Utile en dev macOS où le scan conteneurisé voit les réseaux internes de la VM Docker (172.30.x, etc.) qui ne doivent pas polluer la base.
+
+### Scan périodique automatique
+
+Un scan automatique est lancé en tâche de fond à intervalle régulier depuis le lifespan FastAPI (`periodic_scan_loop` dans `main.py`). Il réutilise `scan_network` (donc `SCAN_SUBNET` s'applique) et maintient la base à jour (`discovered`, `last_seen`, nouveaux devices). L'intervalle se configure via la variable d'env `SCAN_INTERVAL_MINUTES` en minutes (`SCAN_INTERVAL_MINUTES=${SCAN_INTERVAL_MINUTES:-15}`), valeur **0 pour désactiver**.
+
+### Périphériques hors ligne
+
+Un device découvert est considéré **hors ligne** si son `last_seen` est antérieur à `OFFLINE_TIMEOUT_MINUTES` (`OFFLINE_TIMEOUT_MINUTES=${OFFLINE_TIMEOUT_MINUTES:-30}`). Les devices ajoutés manuellement (`discovered=false`) sont toujours considérés en ligne. Conséquences :
+- **Graphe** (`GET /api/graph`) : les devices hors ligne sont exclus des noeuds (et leurs arêtes sont filtrées).
+- **Liste** (`DeviceResponse.online`) : tous les devices sont listés, avec colonne `last_seen` et ligne atténuée si `online=false`.
 
 Sur **Linux**, `network_mode: host` + `privileged: true` permet un ARP scan complet du LAN.
 

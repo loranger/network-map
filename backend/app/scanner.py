@@ -1,5 +1,8 @@
+import ipaddress
+import os
 import re
 import subprocess
+import threading
 from datetime import datetime
 
 from sqlalchemy.orm import Session
@@ -24,6 +27,16 @@ BOGUS_RANGES = [
     re.compile(r'^0\.'),
 ]
 
+DEFAULT_SUBNET = os.environ.get("SCAN_SUBNET", "192.168.1.0/24")
+
+EXCLUDED_NETWORKS = [
+    ipaddress.ip_network(n.strip(), strict=False)
+    for n in os.environ.get("SCAN_EXCLUDE_SUBNETS", "").split(",")
+    if n.strip()
+]
+
+PERSIST_LOCK = threading.Lock()
+
 
 def _is_valid_host(ip: str) -> bool:
     if ip is None:
@@ -40,6 +53,14 @@ def _is_valid_host(ip: str) -> bool:
     for r in BOGUS_RANGES:
         if r.match(ip):
             return False
+    if EXCLUDED_NETWORKS:
+        try:
+            ipobj = ipaddress.ip_address(ip)
+        except ValueError:
+            return False
+        for net in EXCLUDED_NETWORKS:
+            if ipobj in net:
+                return False
     return True
 
 
@@ -76,52 +97,58 @@ def _parse_arp_table(output: str):
 
 
 def _persist(devices: list[dict], db: Session):
-    for d in devices:
-        ip, mac, hostname = d["ip"], d.get("mac"), d.get("hostname")
-        existing = None
-        if mac:
-            ip_entry = db.query(models.DeviceIP).filter(
-                models.DeviceIP.mac == mac
-            ).first()
-            existing = ip_entry.device if ip_entry else None
-        if not existing and ip:
-            existing = db.query(models.Device).filter(
-                models.Device.ips.any(models.DeviceIP.ipv4 == ip)
-            ).first()
-        if existing:
-            existing.last_seen = datetime.utcnow()
-            existing.discovered = True
-            if hostname and not existing.hostname:
-                existing.hostname = hostname
-            if hostname and existing.name.startswith("device-"):
-                short = hostname.split(".")[0] if "." in hostname else hostname
-                existing.name = short
-            ip_match = next((dev_ip for dev_ip in existing.ips if dev_ip.ipv4 == ip), None)
-            if ip_match:
-                if mac and not ip_match.mac:
-                    ip_match.mac = mac
-            elif ip:
-                dev_ip = models.DeviceIP(device_id=existing.id, ipv4=ip, mac=mac)
+    with PERSIST_LOCK:
+        for d in devices:
+            ip, mac, hostname = d["ip"], d.get("mac"), d.get("hostname")
+            existing = None
+            if mac:
+                ip_entry = db.query(models.DeviceIP).filter(
+                    models.DeviceIP.mac == mac
+                ).first()
+                existing = ip_entry.device if ip_entry else None
+            if not existing and ip:
+                existing = db.query(models.Device).filter(
+                    models.Device.ips.any(models.DeviceIP.ipv4 == ip)
+                ).first()
+            if existing:
+                existing.last_seen = datetime.utcnow()
+                existing.discovered = True
+                if hostname and not existing.hostname:
+                    existing.hostname = hostname
+                if hostname and existing.name.startswith("device-"):
+                    short = hostname.split(".")[0] if "." in hostname else hostname
+                    existing.name = short
+                ip_match = next((dev_ip for dev_ip in existing.ips if dev_ip.ipv4 == ip), None)
+                if ip_match:
+                    if mac and not ip_match.mac:
+                        ip_match.mac = mac
+                elif ip:
+                    owner = db.query(models.DeviceIP).filter(
+                        models.DeviceIP.ipv4 == ip
+                    ).first()
+                    if owner is None:
+                        dev_ip = models.DeviceIP(device_id=existing.id, ipv4=ip, mac=mac)
+                        auto_assign_network(db, dev_ip)
+                        db.add(dev_ip)
+            elif mac:
+                suffix = mac.replace(":", "").lower()
+                name = hostname.split(".")[0] if hostname else f"device-{suffix}"
+                dev = models.Device(
+                    name=name,
+                    device_type="other",
+                    hostname=hostname,
+                    discovered=True,
+                )
+                db.add(dev)
+                db.flush()
+                dev_ip = models.DeviceIP(device_id=dev.id, ipv4=ip, mac=mac)
                 auto_assign_network(db, dev_ip)
                 db.add(dev_ip)
-        elif mac:
-            suffix = mac.replace(":", "").lower()
-            name = hostname.split(".")[0] if hostname else f"device-{suffix}"
-            dev = models.Device(
-                name=name,
-                device_type="other",
-                hostname=hostname,
-                discovered=True,
-            )
-            db.add(dev)
-            db.flush()
-            dev_ip = models.DeviceIP(device_id=dev.id, ipv4=ip, mac=mac)
-            auto_assign_network(db, dev_ip)
-            db.add(dev_ip)
-    db.commit()
+        db.commit()
 
 
-def scan_network(subnet: str = "192.168.1.0/24", db: Session = None):
+def scan_network(subnet: str = None, db: Session = None):
+    subnet = subnet or DEFAULT_SUBNET
     seen = {}
     found = []
 

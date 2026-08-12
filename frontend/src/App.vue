@@ -53,6 +53,12 @@
                   </router-link>
                 </li>
                 <li>
+                  <router-link to="/floors" class="flex items-center gap-3">
+                    <Layers :size="18" :stroke-width="2" />
+                    Étages
+                  </router-link>
+                </li>
+                <li>
                   <router-link to="/locations" class="flex items-center gap-3">
                     <MapPin :size="18" :stroke-width="2" />
                     Emplacements
@@ -68,5 +74,5 @@
 </template>
 
 <script setup>
-import { Menu, Monitor, Network, Wifi, MapPin, Shapes, Settings } from '@lucide/vue'
+import { Menu, Monitor, Network, Wifi, MapPin, Shapes, Settings, Layers } from '@lucide/vue'
 </script>

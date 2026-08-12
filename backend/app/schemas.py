@@ -25,9 +25,30 @@ class SwitchPortResponse(SwitchPortBase):
     model_config = {"from_attributes": True}
 
 
+class FloorBase(BaseModel):
+    name: str
+    is_default: bool = False
+
+
+class FloorCreate(FloorBase):
+    pass
+
+
+class FloorUpdate(BaseModel):
+    name: Optional[str] = None
+    is_default: Optional[bool] = None
+
+
+class FloorResponse(FloorBase):
+    id: int
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 class LocationBase(BaseModel):
     name: str
-    floor: Optional[str] = None
+    floor_id: Optional[int] = None
 
 
 class LocationCreate(LocationBase):
@@ -36,11 +57,12 @@ class LocationCreate(LocationBase):
 
 class LocationUpdate(BaseModel):
     name: Optional[str] = None
-    floor: Optional[str] = None
+    floor_id: Optional[int] = None
 
 
 class LocationResponse(LocationBase):
     id: int
+    floor_name: Optional[str] = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -97,6 +119,7 @@ class DeviceUpdate(BaseModel):
 class DeviceResponse(DeviceBase):
     id: int
     discovered: bool
+    online: bool
     last_seen: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime

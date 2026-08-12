@@ -3,6 +3,7 @@
     <div class="flex items-center justify-between mb-6">
       <h1 class="text-2xl font-bold">Périphériques</h1>
       <div class="flex gap-2">
+        <input v-model="scanSubnet" type="text" placeholder="192.168.1.0/24" class="input input-bordered w-44 hidden md:inline-flex" title="Sous-réseau à scanner" />
         <button class="btn btn-outline" @click="scanNetwork" :disabled="scanning">
           <Search v-if="!scanning" :size="18" :stroke-width="2" />
           <span v-else class="loading loading-spinner"></span>
@@ -38,6 +39,11 @@
         <option value="">Tous les réseaux</option>
         <option v-for="net in networks" :key="net.id" :value="net.id">{{ net.name }}</option>
       </select>
+      <select class="select select-bordered select-sm" v-model="filterStatus">
+        <option value="">En ligne et hors ligne</option>
+        <option value="online">En ligne</option>
+        <option value="offline">Hors ligne</option>
+      </select>
     </div>
 
     <div class="overflow-x-auto">
@@ -60,12 +66,13 @@
             <th class="hidden xl:table-cell cursor-pointer select-none" @click="toggleSort('location_floor')">
               Étage <span v-if="sortCol === 'location_floor'" class="text-xs">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
             </th>
+            <th class="hidden md:table-cell">Dernière apparition</th>
             <th class="hidden md:table-cell">Admin</th>
             <th></th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="d in filteredDevices" :key="d.id">
+          <tr v-for="d in filteredDevices" :key="d.id" :class="{ 'opacity-50': !d.online }">
             <td class="font-medium">
               <router-link :to="`/devices/${d.id}`" class="link link-hover">{{ capitalize(d.name) }}</router-link>
             </td>
@@ -85,6 +92,9 @@
             <td class="hidden xl:table-cell text-sm">{{ d.manufacturer || '-' }}</td>
             <td>{{ capitalize(d.location_name) || '-' }}</td>
             <td class="hidden xl:table-cell">{{ capitalize(d.location_floor) || '-' }}</td>
+            <td class="hidden md:table-cell text-sm" :title="d.last_seen ? new Date(d.last_seen).toLocaleString() : ''">
+              {{ formatLastSeen(d.last_seen) }}
+            </td>
             <td class="hidden md:table-cell">
               <a v-if="d.admin_url" :href="resolveAdminUrl(d)" target="_blank" rel="noopener noreferrer" class="link link-primary" @click.stop>
                 <ExternalLink :size="16" :stroke-width="2" />
@@ -98,7 +108,7 @@
             </td>
           </tr>
           <tr v-if="filteredDevices.length === 0">
-            <td colspan="9" class="text-center text-base-content/50 py-8">
+            <td colspan="10" class="text-center text-base-content/50 py-8">
               Aucun périphérique trouvé
             </td>
           </tr>
@@ -153,7 +163,7 @@
             <label class="label"><span class="label-text">Emplacement</span></label>
             <select v-model="form.location_id" class="select select-bordered">
               <option :value="null">- Aucun -</option>
-              <option v-for="loc in locations" :key="loc.id" :value="loc.id">{{ capitalize(loc.name) }} ({{ loc.floor || '?' }})</option>
+              <option v-for="loc in locations" :key="loc.id" :value="loc.id">{{ capitalize(loc.name) }} ({{ loc.floor_name || '?' }})</option>
             </select>
           </div>
           <div class="form-control mb-3">
@@ -183,10 +193,12 @@ const filterName = ref('')
 const filterType = ref('')
 const filterLocation = ref('')
 const filterNetwork = ref('')
+const filterStatus = ref('')
 const sortCol = ref('name')
 const sortDir = ref('asc')
 const scanning = ref(false)
 const enriching = ref(false)
+const scanSubnet = ref('')
 
 const form = ref({
   name: '', device_type: 'computer', ip: '', location_id: null, admin_url: '',
@@ -204,6 +216,8 @@ const filteredDevices = computed(() => {
       const allNetIds = [...ipNetIds, ...apNetIds]
       if (!allNetIds.includes(netId)) return false
     }
+    if (filterStatus.value === 'online' && d.online === false) return false
+    if (filterStatus.value === 'offline' && d.online !== false) return false
     return true
   })
   if (sortCol.value) {
@@ -227,6 +241,18 @@ function toggleSort(col) {
 
 function capitalize(s) {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''
+}
+
+function formatLastSeen(ts) {
+  if (!ts) return '-'
+  const d = new Date(ts)
+  if (isNaN(d.getTime())) return '-'
+  const diffMin = Math.floor((Date.now() - d.getTime()) / 60000)
+  if (diffMin < 1) return "à l'instant"
+  if (diffMin < 60) return `il y a ${diffMin} min`
+  const diffHours = Math.floor(diffMin / 60)
+  if (diffHours < 24) return `il y a ${diffHours} h`
+  return d.toLocaleDateString()
 }
 
 function typeColor(type) {
@@ -294,7 +320,8 @@ async function deleteDevice(id) {
 async function scanNetwork() {
   scanning.value = true
   try {
-    const { data } = await axios.post('/api/scan')
+    const payload = scanSubnet.value ? { subnet: scanSubnet.value } : {}
+    const { data } = await axios.post('/api/scan', payload)
     if (data.hint) {
       alert(data.hint)
     } else {

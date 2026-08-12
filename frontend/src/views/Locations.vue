@@ -2,7 +2,7 @@
   <div>
     <div class="flex items-center justify-between mb-6">
       <h1 class="text-2xl font-bold">Emplacements</h1>
-      <button class="btn btn-primary" onclick="loc_modal.showModal()">
+      <button class="btn btn-primary" @click="openAdd">
         <Plus :size="18" :stroke-width="2" />
         Ajouter
       </button>
@@ -12,7 +12,7 @@
       <div v-for="loc in locations" :key="loc.id" class="card bg-base-200">
         <div class="card-body">
           <h2 class="card-title">{{ capitalize(loc.name) }}</h2>
-          <div class="text-sm opacity-60">Étage : {{ loc.floor || '-' }}</div>
+          <div class="text-sm opacity-60">Étage : {{ loc.floor_name || '-' }}</div>
           <div class="card-actions justify-end mt-2">
             <button class="btn btn-ghost btn-xs" @click="openEdit(loc)">
               <Pencil :size="16" :stroke-width="2" />
@@ -42,7 +42,10 @@
           </div>
           <div class="form-control mb-3">
             <label class="label"><span class="label-text">Étage</span></label>
-            <input v-model="form.floor" class="input input-bordered" placeholder="ex: RDC, 1er..." />
+            <select v-model="form.floor_id" class="select select-bordered">
+              <option :value="null">— Aucun —</option>
+              <option v-for="f in floors" :key="f.id" :value="f.id">{{ f.name }}</option>
+            </select>
           </div>
           <div class="modal-action">
             <button type="button" class="btn" onclick="loc_modal.close()">Annuler</button>
@@ -62,7 +65,10 @@
           </div>
           <div class="form-control mb-3">
             <label class="label"><span class="label-text">Étage</span></label>
-            <input v-model="editForm.floor" class="input input-bordered" placeholder="ex: RDC, 1er..." />
+            <select v-model="editForm.floor_id" class="select select-bordered">
+              <option :value="null">— Aucun —</option>
+              <option v-for="f in floors" :key="f.id" :value="f.id">{{ f.name }}</option>
+            </select>
           </div>
           <div class="modal-action">
             <button type="button" class="btn" onclick="edit_loc_modal.close()">Annuler</button>
@@ -80,8 +86,9 @@ import axios from 'axios'
 import { Plus, Pencil, Trash2 } from '@lucide/vue'
 
 const locations = ref([])
-const form = ref({ name: '', floor: '' })
-const editForm = ref({ name: '', floor: '' })
+const floors = ref([])
+const form = ref({ name: '', floor_id: null })
+const editForm = ref({ name: '', floor_id: null })
 
 function capitalize(s) {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''
@@ -92,22 +99,32 @@ async function fetchLocations() {
   locations.value = data
 }
 
+async function fetchFloors() {
+  const { data } = await axios.get('/api/floors')
+  floors.value = data
+}
+
+function openAdd() {
+  form.value = { name: '', floor_id: null }
+  document.getElementById('loc_modal').showModal()
+}
+
 async function addLocation() {
   await axios.post('/api/locations', form.value)
-  form.value = { name: '', floor: '' }
+  form.value = { name: '', floor_id: null }
   document.getElementById('loc_modal').close()
   fetchLocations()
 }
 
 function openEdit(loc) {
-  editForm.value = { id: loc.id, name: loc.name, floor: loc.floor }
+  editForm.value = { id: loc.id, name: loc.name, floor_id: loc.floor_id }
   document.getElementById('edit_loc_modal').showModal()
 }
 
 async function updateLocation() {
   await axios.put(`/api/locations/${editForm.value.id}`, {
     name: editForm.value.name,
-    floor: editForm.value.floor,
+    floor_id: editForm.value.floor_id,
   })
   document.getElementById('edit_loc_modal').close()
   fetchLocations()
@@ -119,5 +136,8 @@ async function deleteLocation(id) {
   fetchLocations()
 }
 
-onMounted(fetchLocations)
+onMounted(() => {
+  fetchLocations()
+  fetchFloors()
+})
 </script>

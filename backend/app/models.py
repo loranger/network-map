@@ -1,8 +1,13 @@
+import os
+from datetime import datetime, timedelta
+
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Table, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from .database import Base
+
+OFFLINE_TIMEOUT_MINUTES = int(os.environ.get("OFFLINE_TIMEOUT_MINUTES", "30"))
 
 
 device_ap_networks = Table(
@@ -13,14 +18,26 @@ device_ap_networks = Table(
 )
 
 
+class Floor(Base):
+    __tablename__ = "floors"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False, unique=True)
+    is_default = Column(Boolean, default=False)
+    created_at = Column(DateTime, server_default=func.now())
+
+    locations = relationship("Location", back_populates="floor_ref")
+
+
 class Location(Base):
     __tablename__ = "locations"
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
-    floor = Column(String, nullable=True)
+    floor_id = Column(Integer, ForeignKey("floors.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime, server_default=func.now())
 
+    floor_ref = relationship("Floor", back_populates="locations")
     devices = relationship("Device", back_populates="location_ref")
 
 
@@ -71,6 +88,15 @@ class Device(Base):
                                  cascade="all, delete-orphan")
     ap_networks = relationship("Network", secondary=device_ap_networks,
                                back_populates="ap_devices")
+
+    @property
+    def online(self) -> bool:
+        if not self.discovered:
+            return True
+        if self.last_seen is None:
+            return False
+        cutoff = datetime.utcnow() - timedelta(minutes=OFFLINE_TIMEOUT_MINUTES)
+        return self.last_seen >= cutoff
 
     @property
     def ap_network_ids(self) -> list[int]:
