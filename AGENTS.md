@@ -286,18 +286,18 @@ Le scanner combine deux méthodes :
 2. **arp -a** — fallback si nmap ne trouve rien
 
 Le sous-réseau par défaut est `192.168.1.0/24`, mais il est configurable :
-- Via la variable d'env `SCAN_SUBNET` dans `docker-compose.yml` (`SCAN_SUBNET=${SCAN_SUBNET:-192.168.1.0/24}`)
+- Via la variable d'env `SCAN_SUBNET` dans `.env` (copier `.env.example`)
 - Via le champ "Sous-réseau" du bouton Scanner dans la vue Périphériques, envoyé dans le body de `POST /api/scan` (`{"subnet": "..."}`)
 
 Des sous-réseaux entiers peuvent être exclus de la découverte via `SCAN_EXCLUDE_SUBNETS` (liste comma-séparée de CIDR, ex: `172.30.0.0/16,192.168.139.0/24`). Utile en dev macOS où le scan conteneurisé voit les réseaux internes de la VM Docker (172.30.x, etc.) qui ne doivent pas polluer la base.
 
 ### Scan périodique automatique
 
-Un scan automatique est lancé en tâche de fond à intervalle régulier depuis le lifespan FastAPI (`periodic_scan_loop` dans `main.py`). Il réutilise `scan_network` (donc `SCAN_SUBNET` s'applique) et maintient la base à jour (`discovered`, `last_seen`, nouveaux devices). L'intervalle se configure via la variable d'env `SCAN_INTERVAL_MINUTES` en minutes (`SCAN_INTERVAL_MINUTES=${SCAN_INTERVAL_MINUTES:-15}`), valeur **0 pour désactiver**.
+Un scan automatique est lancé en tâche de fond à intervalle régulier depuis le lifespan FastAPI (`periodic_scan_loop` dans `main.py`). Il réutilise `scan_network` (donc `SCAN_SUBNET` s'applique) et maintient la base à jour (`discovered`, `last_seen`, nouveaux devices). L'intervalle se configure via la variable d'env `SCAN_INTERVAL_MINUTES` en minutes, valeur **0 pour désactiver**.
 
 ### Périphériques hors ligne
 
-Un device découvert est considéré **hors ligne** si son `last_seen` est antérieur à `OFFLINE_TIMEOUT_MINUTES` (`OFFLINE_TIMEOUT_MINUTES=${OFFLINE_TIMEOUT_MINUTES:-30}`). Les devices ajoutés manuellement (`discovered=false`) sont toujours considérés en ligne. Conséquences :
+Un device découvert est considéré **hors ligne** si son `last_seen` est antérieur à `OFFLINE_TIMEOUT_MINUTES`. Les devices ajoutés manuellement (`discovered=false`) sont toujours considérés en ligne. Conséquences :
 - **Graphe** (`GET /api/graph`) : les devices hors ligne sont exclus des noeuds (et leurs arêtes sont filtrées).
 - **Liste** (`DeviceResponse.online`) : tous les devices sont listés, avec colonne `last_seen` et ligne atténuée si `online=false`.
 
@@ -328,6 +328,8 @@ docker compose up -d --build
 ```
 
 Les deux services utilisent `network_mode: host` pour partager la pile réseau de l'hôte, nécessaire au scan ARP.
+
+Les variables d'environnement sont chargées via un fichier `.env` à la racine (copier `.env.example` et ajuster).
 
 Deux services :
 - **backend** (port 8000) : API FastAPI avec volume persistant pour SQLite
