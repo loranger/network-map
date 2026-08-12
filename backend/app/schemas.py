@@ -97,6 +97,7 @@ class DeviceBase(BaseModel):
     ap_network_ids: list[int] = []
     notes: Optional[str] = None
     admin_url: Optional[str] = None
+    icon: Optional[str] = None
 
 
 class DeviceCreate(DeviceBase):
@@ -209,6 +210,7 @@ class DeviceTypeBase(BaseModel):
     type: str
     label: str
     color: str
+    icon: Optional[str] = None
 
 
 class DeviceTypeCreate(DeviceTypeBase):
@@ -218,6 +220,7 @@ class DeviceTypeCreate(DeviceTypeBase):
 class DeviceTypeUpdate(BaseModel):
     label: Optional[str] = None
     color: Optional[str] = None
+    icon: Optional[str] = None
 
 
 class DeviceTypeResponse(DeviceTypeBase):

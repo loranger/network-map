@@ -15,6 +15,7 @@
         :class="hiddenTypes.includes(dt.type) ? 'btn-outline opacity-40' : 'btn-ghost'"
         @click="toggleType(dt.type)">
         <span class="w-3 h-3 rounded-sm" :style="{ background: dt.color }"></span>
+        <img :src="iconDataUrl(dt.icon, '#94a3b8')" class="w-4 h-4" />
         {{ dt.label }}
       </button>
     </div>
@@ -41,6 +42,7 @@ import cytoscape from 'cytoscape'
 import fcose from 'cytoscape-fcose'
 import axios from 'axios'
 import { RefreshCw } from '@lucide/vue'
+import { iconDataUrl } from '../icons.js'
 
 cytoscape.use(fcose)
 

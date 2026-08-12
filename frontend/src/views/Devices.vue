@@ -66,7 +66,9 @@
             <th class="hidden xl:table-cell cursor-pointer select-none" @click="toggleSort('location_floor')">
               Étage <span v-if="sortCol === 'location_floor'" class="text-xs">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
             </th>
-            <th class="hidden md:table-cell">Dernière apparition</th>
+            <th class="hidden md:table-cell cursor-pointer select-none" @click="toggleSort('last_seen')">
+              Dernière apparition <span v-if="sortCol === 'last_seen'" class="text-xs">{{ sortDir === 'asc' ? '▲' : '▼' }}</span>
+            </th>
             <th class="hidden md:table-cell">Admin</th>
             <th></th>
           </tr>
@@ -74,7 +76,10 @@
         <tbody>
           <tr v-for="d in filteredDevices" :key="d.id" :class="{ 'opacity-50': !d.online }">
             <td class="font-medium">
-              <router-link :to="`/devices/${d.id}`" class="link link-hover">{{ capitalize(d.name) }}</router-link>
+              <div class="flex items-center gap-2">
+                <img :src="iconDataUrl(deviceIconName(d), '#334155')" class="w-5 h-5 opacity-70 shrink-0" />
+                <router-link :to="`/devices/${d.id}`" class="link link-hover">{{ capitalize(d.name) }}</router-link>
+              </div>
             </td>
             <td class="hidden md:table-cell">
               <span class="badge text-white border-0" :style="{ backgroundColor: typeColor(d.device_type) }">{{ typeLabel(d.device_type) }}</span>
@@ -184,6 +189,7 @@
 import { ref, computed, onMounted } from 'vue'
 import axios from 'axios'
 import { Search, Download, Info, Plus, Trash2, ExternalLink } from '@lucide/vue'
+import { iconDataUrl } from '../icons.js'
 
 const devices = ref([])
 const locations = ref([])
@@ -224,6 +230,8 @@ const filteredDevices = computed(() => {
     list = [...list].sort((a, b) => {
       const va = (a[sortCol.value] || '').toString().toLowerCase()
       const vb = (b[sortCol.value] || '').toString().toLowerCase()
+      if (va === '' && vb !== '') return 1
+      if (vb === '' && va !== '') return -1
       return sortDir.value === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va)
     })
   }
@@ -235,7 +243,7 @@ function toggleSort(col) {
     sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
   } else {
     sortCol.value = col
-    sortDir.value = 'asc'
+    sortDir.value = col === 'last_seen' ? 'desc' : 'asc'
   }
 }
 
@@ -270,6 +278,12 @@ function resolveAdminUrl(d) {
 function typeLabel(type) {
   const found = deviceTypes.value.find(dt => dt.type === type)
   return found ? found.label : type
+}
+
+function deviceIconName(d) {
+  if (d.icon) return d.icon
+  const dt = deviceTypes.value.find(t => t.type === d.device_type)
+  return dt?.icon || 'box'
 }
 
 function networkColor(networkId) {

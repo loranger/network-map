@@ -172,6 +172,16 @@ async def lifespan(app: FastAPI):
             conn.commit()
         except Exception:
             pass
+        try:
+            conn.execute(sql_text("ALTER TABLE device_types ADD COLUMN icon VARCHAR"))
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            conn.execute(sql_text("ALTER TABLE devices ADD COLUMN icon VARCHAR"))
+            conn.commit()
+        except Exception:
+            pass
     with Session(engine) as session:
         # --- Add floor_id column to locations if missing ---
         try:
@@ -246,18 +256,26 @@ async def lifespan(app: FastAPI):
 
         if session.query(models.DeviceType).count() == 0:
             defaults = [
-                models.DeviceType(type="router", label="Routeur", color="#3b82f6"),
-                models.DeviceType(type="modem", label="Modem", color="#8b5cf6"),
-                models.DeviceType(type="ap", label="Point d'accès", color="#06b6d4"),
-                models.DeviceType(type="switch", label="Switch", color="#f59e0b"),
-                models.DeviceType(type="computer", label="Ordinateur", color="#10b981"),
-                models.DeviceType(type="server", label="Serveur", color="#ef4444"),
-                models.DeviceType(type="iot", label="IoT", color="#ec4899"),
-                models.DeviceType(type="other", label="Autre", color="#6b7280"),
+                models.DeviceType(type="router", label="Routeur", color="#3b82f6", icon="router"),
+                models.DeviceType(type="modem", label="Modem", color="#8b5cf6", icon="network"),
+                models.DeviceType(type="ap", label="Point d'accès", color="#06b6d4", icon="radio"),
+                models.DeviceType(type="switch", label="Switch", color="#f59e0b", icon="arrow-left-right"),
+                models.DeviceType(type="computer", label="Ordinateur", color="#10b981", icon="monitor"),
+                models.DeviceType(type="server", label="Serveur", color="#ef4444", icon="server"),
+                models.DeviceType(type="iot", label="IoT", color="#ec4899", icon="lightbulb"),
+                models.DeviceType(type="other", label="Autre", color="#6b7280", icon="box"),
             ]
             for dt in defaults:
                 session.add(dt)
             session.commit()
+        default_icons = {
+            "router": "router", "modem": "network", "ap": "radio",
+            "switch": "arrow-left-right", "computer": "monitor",
+            "server": "server", "iot": "lightbulb", "other": "box",
+        }
+        for dt in session.query(models.DeviceType).filter(models.DeviceType.icon.is_(None)).all():
+            dt.icon = default_icons.get(dt.type, "box")
+        session.commit()
     scan_task = asyncio.create_task(periodic_scan_loop())
     yield
     scan_task.cancel()

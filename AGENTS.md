@@ -82,6 +82,7 @@ Stocké dans la table `devices`. Représente tout périphérique réseau.
 | location_id | Integer FK? | Référence vers locations.id |
 | notes | Text? | Notes libres |
 | admin_url | String? | URL interface d'admin (ex: http://{ip}:2112, le placeholder {ip} est résolu côté frontend) |
+| icon | String? | Nom de l'icône Lucide (fallback sur icône du type si null) |
 | discovered | Boolean | Vrai si trouvé par scan automatique |
 | last_seen | DateTime? | Dernière date de détection |
 | created_at | DateTime | Auto |
@@ -180,8 +181,9 @@ Stocké dans la table `device_types`. Type de périphérique avec libellé et co
 | type | String | Identifiant technique (ex: router, switch) |
 | label | String | Libellé affiché (ex: Routeur, Switch) |
 | color | String | Couleur hex (ex: #3b82f6) |
+| icon | String? | Nom de l'icône Lucide (ex: monitor, server) |
 
-Les types sont seedés au démarrage avec les couleurs d'origine. Les couleurs ne sont plus hardcodées nulle part — elles viennent de la DB via l'API. Ajout d'un nouveau type via l'UI génère une couleur aléatoire sombre (HSL, luminance 25–50%).
+Les types sont seedés au démarrage avec les couleurs d'origine. Les couleurs ne sont plus hardcodées nulle part — elles viennent de la DB via l'API. Ajout d'un nouveau type via l'UI génère une couleur aléatoire sombre (HSL, luminance 25–50%) et propose un sélecteur d'icône (parmi 437 icônes Lucide disponibles). Les icônes sont utilisées sur le graphe et dans la liste des périphériques.
 
 ## API REST
 

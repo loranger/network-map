@@ -12,7 +12,9 @@
       <div v-for="dt in types" :key="dt.id" class="card bg-base-200">
         <div class="card-body">
           <div class="flex items-center gap-3">
-            <span class="w-5 h-5 rounded" :style="{ backgroundColor: dt.color }"></span>
+            <span class="w-7 h-7 rounded flex items-center justify-center" :style="{ backgroundColor: dt.color }">
+              <img :src="iconDataUrl(dt.icon, '#fff')" class="w-4 h-4" />
+            </span>
             <h2 class="card-title">{{ dt.label }}</h2>
           </div>
           <div class="text-sm opacity-60 font-mono">{{ dt.type }}</div>
@@ -35,7 +37,7 @@
       </div>
     </div>
 
-    <dialog id="dt_modal" class="modal">
+    <dialog ref="addModal" class="modal">
       <div class="modal-box">
         <h3 class="text-lg font-bold mb-4">Ajouter un type</h3>
         <form @submit.prevent="addType">
@@ -54,15 +56,28 @@
               <span class="text-sm font-mono">{{ form.color }}</span>
             </div>
           </div>
+          <div class="form-control mb-3">
+            <label class="label"><span class="label-text">Icône</span></label>
+            <input v-model="iconSearch" type="search" placeholder="Rechercher…" class="input input-bordered input-sm mb-2" />
+            <div class="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto p-2 bg-base-200 rounded-lg">
+              <button type="button" v-for="name in filteredIconNames" :key="name"
+                class="btn btn-ghost btn-sm"
+                :class="{ 'btn-primary': form.icon === name }"
+                @click="form.icon = name; iconSearch = ''">
+                <img :src="iconDataUrl(name, '#374151')" class="w-5 h-5" :title="name" />
+              </button>
+            </div>
+          </div>
           <div class="modal-action">
-            <button type="button" class="btn" onclick="dt_modal.close()">Annuler</button>
+            <button type="button" class="btn" @click="addModal?.close()">Annuler</button>
             <button type="submit" class="btn btn-primary">Ajouter</button>
           </div>
         </form>
       </div>
+      <form method="dialog" class="modal-backdrop"><button></button></form>
     </dialog>
 
-    <dialog id="edit_dt_modal" class="modal">
+    <dialog ref="editModal" class="modal">
       <div class="modal-box">
         <h3 class="text-lg font-bold mb-4">Modifier le type</h3>
         <form @submit.prevent="updateType">
@@ -77,22 +92,46 @@
               <span class="text-sm font-mono">{{ editForm.color }}</span>
             </div>
           </div>
+          <div class="form-control mb-3">
+            <label class="label"><span class="label-text">Icône</span></label>
+            <input v-model="iconSearch" type="search" placeholder="Rechercher…" class="input input-bordered input-sm mb-2" />
+            <div class="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto p-2 bg-base-200 rounded-lg">
+              <button type="button" v-for="name in filteredIconNames" :key="name"
+                class="btn btn-ghost btn-sm"
+                :class="{ 'btn-primary': editForm.icon === name }"
+                @click="editForm.icon = name; iconSearch = ''">
+                <img :src="iconDataUrl(name, '#374151')" class="w-5 h-5" :title="name" />
+              </button>
+            </div>
+          </div>
           <div class="modal-action">
-            <button type="button" class="btn" onclick="edit_dt_modal.close()">Annuler</button>
+            <button type="button" class="btn" @click="editModal?.close()">Annuler</button>
             <button type="submit" class="btn btn-primary">Enregistrer</button>
           </div>
         </form>
       </div>
+      <form method="dialog" class="modal-backdrop"><button></button></form>
     </dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import axios from 'axios'
 import { Plus, Pencil, Trash2 } from '@lucide/vue'
+import { ICON_NAMES, iconDataUrl } from '../icons.js'
 
+const addModal = ref(null)
+const editModal = ref(null)
 const types = ref([])
+const iconSearch = ref('')
+
+const filteredIconNames = computed(() => {
+  const q = iconSearch.value.toLowerCase()
+  if (!q) return ICON_NAMES
+  return ICON_NAMES.filter(n => n.includes(q))
+})
+
 function randomDarkColor() {
   const h = Math.floor(Math.random() * 360)
   const s = 50 + Math.floor(Math.random() * 30)
@@ -100,12 +139,12 @@ function randomDarkColor() {
   return `hsl(${h}, ${s}%, ${l}%)`
 }
 
-const form = ref({ type: '', label: '', color: '#6b7280' })
-const editForm = ref({ label: '', color: '' })
+const form = ref({ type: '', label: '', color: '#6b7280', icon: 'box' })
+const editForm = ref({ label: '', color: '', icon: 'box' })
 
 function openAdd() {
-  form.value = { type: '', label: '', color: randomDarkColor() }
-  document.getElementById('dt_modal').showModal()
+  form.value = { type: '', label: '', color: randomDarkColor(), icon: 'box' }
+  addModal.value?.showModal()
 }
 
 async function fetchTypes() {
@@ -115,22 +154,22 @@ async function fetchTypes() {
 
 async function addType() {
   await axios.post('/api/device-types', form.value)
-  form.value = { type: '', label: '', color: randomDarkColor() }
-  document.getElementById('dt_modal').close()
+  addModal.value?.close()
   fetchTypes()
 }
 
 function openEdit(dt) {
-  editForm.value = { id: dt.id, label: dt.label, color: dt.color }
-  document.getElementById('edit_dt_modal').showModal()
+  editForm.value = { id: dt.id, label: dt.label, color: dt.color, icon: dt.icon || 'box' }
+  editModal.value?.showModal()
 }
 
 async function updateType() {
   await axios.put(`/api/device-types/${editForm.value.id}`, {
     label: editForm.value.label,
     color: editForm.value.color,
+    icon: editForm.value.icon,
   })
-  document.getElementById('edit_dt_modal').close()
+  editModal.value?.close()
   fetchTypes()
 }
 

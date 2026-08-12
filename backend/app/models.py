@@ -69,6 +69,7 @@ class Device(Base):
     location_id = Column(Integer, ForeignKey("locations.id", ondelete="SET NULL"), nullable=True)
     notes = Column(Text, nullable=True)
     admin_url = Column(String, nullable=True)
+    icon = Column(String, nullable=True)
     discovered = Column(Boolean, default=False)
     last_seen = Column(DateTime, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
@@ -146,6 +147,7 @@ class DeviceType(Base):
     type = Column(String, unique=True, nullable=False)
     label = Column(String, nullable=False)
     color = Column(String, nullable=False)
+    icon = Column(String, nullable=True)
 
 
 class Network(Base):
