@@ -97,7 +97,7 @@
             <td class="hidden xl:table-cell text-sm">{{ d.manufacturer || '-' }}</td>
             <td>{{ capitalize(d.location_name) || '-' }}</td>
             <td class="hidden xl:table-cell">{{ capitalize(d.location_floor) || '-' }}</td>
-            <td class="hidden md:table-cell text-sm" :title="d.last_seen ? new Date(d.last_seen).toLocaleString() : ''">
+            <td class="hidden md:table-cell text-sm" :title="d.last_seen ? new Date(d.last_seen + 'Z').toLocaleString() : ''">
               {{ formatLastSeen(d.last_seen) }}
             </td>
             <td class="hidden md:table-cell">
@@ -253,7 +253,7 @@ function capitalize(s) {
 
 function formatLastSeen(ts) {
   if (!ts) return '-'
-  const d = new Date(ts)
+  const d = new Date(ts + 'Z')
   if (isNaN(d.getTime())) return '-'
   const diffMin = Math.floor((Date.now() - d.getTime()) / 60000)
   if (diffMin < 1) return "à l'instant"
