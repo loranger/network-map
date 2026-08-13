@@ -1,9 +1,14 @@
+import os
 import socket
 from typing import Optional
 
+import dns.reversename
+import dns.resolver
 from sqlalchemy.orm import Session
 
 from . import models
+
+DNS_SERVERS = [s.strip() for s in os.environ.get("DNS_SERVERS", "").split(",") if s.strip()]
 
 OUI_DB = {
     "00037F": "Synology",
@@ -336,6 +341,22 @@ OUI_DB = {
     "FC3F7C": "Canon",
     "FCCE46": "Samsung",
     "FCDF70": "Samsung",
+    "107C61": "ASUS",
+    "2066CF": "Freebox",
+    "381A52": "Epson",
+    "50EBF6": "ASUS",
+    "542A1B": "Sonos",
+    "6CA042": "Silicon Labs",
+    "6CD552": "Bilian",
+    "8C26AA": "Apple",
+    "9009D0": "Synology",
+    "949F3E": "Sonos",
+    "98BD80": "Intel",
+    "9C6B00": "ASRock",
+    "B40AD8": "Sony Interactive",
+    "C435D9": "Apple",
+    "CC988B": "Sony",
+    "CCA7C1": "Google",
 }
 
 # Normalize keys: remove colons so they match lookup_oui() output
@@ -354,13 +375,26 @@ def reverse_dns(ip: str) -> Optional[str]:
         return None
     old_timeout = socket.getdefaulttimeout()
     socket.setdefaulttimeout(3)
+    hostname = None
     try:
         hostname, _, _ = socket.gethostbyaddr(ip)
-        return hostname
     except (socket.herror, socket.gaierror, OSError, TimeoutError):
-        return None
+        pass
     finally:
         socket.setdefaulttimeout(old_timeout)
+    if hostname:
+        return hostname
+    if DNS_SERVERS:
+        resolver = dns.resolver.Resolver()
+        resolver.nameservers = DNS_SERVERS
+        resolver.timeout = 2
+        resolver.lifetime = 2
+        try:
+            answers = resolver.resolve(dns.reversename.from_address(ip), "PTR")
+            return str(answers[0]).rstrip(".")
+        except Exception:
+            return None
+    return None
 
 
 def enrich_device(db: Session, device: models.Device) -> dict:
