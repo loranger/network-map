@@ -327,15 +327,15 @@ Si un hostname est trouvé par reverse DNS **et** que le nom du device commence 
 docker compose up -d --build
 ```
 
-Le backend utilise `network_mode: host` + `privileged: true` pour le scan ARP. Le frontend est sur le réseau Traefik `web` et proxy `/api/` vers le backend via `host.docker.internal:8000` (`extra_hosts` ajouté automatiquement).
+Le backend utilise `network_mode: host` + `privileged: true` pour le scan ARP. Le frontend proxy `/api/` vers le backend via `host.docker.internal:8000` (`extra_hosts` ajouté automatiquement).
 
 Les variables d'environnement sont chargées via un fichier `.env` à la racine (copier `.env.example` et ajuster).
 
 Services :
 - **backend** (port 8000, host) : API FastAPI avec volume persistant pour SQLite
-- **frontend** (port 8080, réseau web) : Nginx servant le build static + proxy `/api/` vers le backend
+- **frontend** (port 8080, host) : Nginx servant le build static + proxy `/api/` vers le backend
 
-Pour Traefik, le réseau `web` doit exister au préalable (`docker network create web`). Les labels Traefik utilisent `${APP_PROJECT}` et `${APP_DOMAIN}` définis dans `.env`.
+`docker-compose.yml` est ignoré par git — copier `docker-compose.example` vers `docker-compose.yml` et ajuster selon le besoin (Traefik, ports, etc.).
 
 ### Règle absolue : tout dans Docker
 
