@@ -12,5 +12,23 @@ services:
   frontend:
     build: ./frontend
     container_name: network-map-frontend
-    network_mode: host
+    env_file: .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    labels:
+      - "traefik.http.routers.${APP_PROJECT:-network-map}.entrypoints=http"
+      - "traefik.http.routers.${APP_PROJECT:-network-map}.rule=Host(`${APP_DOMAIN:-network-map.localhost}`)"
+      - "traefik.http.routers.${APP_PROJECT:-network-map}.middlewares=https-redirect@file"
+      - "traefik.http.routers.${APP_PROJECT:-network-map}-secure.entrypoints=https"
+      - "traefik.http.routers.${APP_PROJECT:-network-map}-secure.rule=Host(`${APP_DOMAIN:-network-map.localhost}`)"
+      - "traefik.http.routers.${APP_PROJECT:-network-map}-secure.tls=true"
+      - "traefik.http.routers.${APP_PROJECT:-network-map}-secure.tls.certresolver=${TLS_CERT_RESOLVER:-letsencrypt}"
+      - "traefik.http.services.${APP_PROJECT:-network-map}-service.loadbalancer.server.port=8080"
+    networks:
+      - web
     restart: unless-stopped
+
+networks:
+  web:
+    name: web
+    external: true
