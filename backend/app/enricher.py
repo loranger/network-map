@@ -1,5 +1,6 @@
 import os
 import socket
+import threading
 from typing import Optional
 
 import dns.reversename
@@ -9,6 +10,8 @@ from sqlalchemy.orm import Session
 from . import models
 
 DNS_SERVERS = [s.strip() for s in os.environ.get("DNS_SERVERS", "").split(",") if s.strip()]
+
+_REVERSE_TIMEOUT = 2
 
 OUI_DB = {
     "00037F": "Synology",
@@ -370,31 +373,44 @@ def lookup_oui(mac: str) -> Optional[str]:
     return OUI_DB.get(prefix)
 
 
+def _ptr_via_dns(ip: str, nameservers: list[str] | None = None) -> Optional[str]:
+    resolver = dns.resolver.Resolver()
+    if nameservers:
+        resolver.nameservers = nameservers
+    resolver.timeout = _REVERSE_TIMEOUT
+    resolver.lifetime = _REVERSE_TIMEOUT
+    try:
+        answers = resolver.resolve(dns.reversename.from_address(ip), "PTR")
+        return str(answers[0]).rstrip(".")
+    except Exception:
+        return None
+
+
+def _gethostbyaddr_bounded(ip: str, timeout: float = _REVERSE_TIMEOUT) -> Optional[str]:
+    box = {"hostname": None}
+
+    def worker():
+        try:
+            hostname, _, _ = socket.gethostbyaddr(ip)
+            box["hostname"] = hostname
+        except Exception:
+            box["hostname"] = None
+
+    thread = threading.Thread(target=worker, daemon=True)
+    thread.start()
+    thread.join(timeout)
+    return box["hostname"]
+
+
 def reverse_dns(ip: str) -> Optional[str]:
     if not ip:
         return None
-    old_timeout = socket.getdefaulttimeout()
-    socket.setdefaulttimeout(3)
-    hostname = None
-    try:
-        hostname, _, _ = socket.gethostbyaddr(ip)
-    except (socket.herror, socket.gaierror, OSError, TimeoutError):
-        pass
-    finally:
-        socket.setdefaulttimeout(old_timeout)
+    if DNS_SERVERS:
+        return _ptr_via_dns(ip, DNS_SERVERS)
+    hostname = _gethostbyaddr_bounded(ip)
     if hostname:
         return hostname
-    if DNS_SERVERS:
-        resolver = dns.resolver.Resolver()
-        resolver.nameservers = DNS_SERVERS
-        resolver.timeout = 2
-        resolver.lifetime = 2
-        try:
-            answers = resolver.resolve(dns.reversename.from_address(ip), "PTR")
-            return str(answers[0]).rstrip(".")
-        except Exception:
-            return None
-    return None
+    return _ptr_via_dns(ip)
 
 
 def enrich_device(db: Session, device: models.Device) -> dict:
