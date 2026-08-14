@@ -54,6 +54,10 @@
             <div class="flex items-center gap-3">
               <input v-model="form.color" type="color" class="w-10 h-10 rounded cursor-pointer border-0 p-0" />
               <span class="text-sm font-mono">{{ form.color }}</span>
+              <button type="button" class="btn btn-ghost btn-xs" @click="form.color = randomDarkColor()">
+                <Shuffle :size="14" :stroke-width="2" />
+                Random
+              </button>
             </div>
           </div>
           <div class="form-control mb-3">
@@ -90,6 +94,10 @@
             <div class="flex items-center gap-3">
               <input v-model="editForm.color" type="color" class="w-10 h-10 rounded cursor-pointer border-0 p-0" />
               <span class="text-sm font-mono">{{ editForm.color }}</span>
+              <button type="button" class="btn btn-ghost btn-xs" @click="editForm.color = randomDarkColor()">
+                <Shuffle :size="14" :stroke-width="2" />
+                Random
+              </button>
             </div>
           </div>
           <div class="form-control mb-3">
@@ -118,7 +126,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import axios from 'axios'
-import { Plus, Pencil, Trash2 } from '@lucide/vue'
+import { Plus, Pencil, Trash2, Shuffle } from '@lucide/vue'
 import { ICON_NAMES, iconDataUrl } from '../icons.js'
 
 const addModal = ref(null)

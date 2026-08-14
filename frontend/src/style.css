@@ -2,6 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
+.badge {
+  white-space: nowrap;
+}
+
 #graph-container {
   width: 100%;
   height: calc(100vh - 8rem);

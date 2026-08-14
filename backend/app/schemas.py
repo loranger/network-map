@@ -114,6 +114,7 @@ class DeviceUpdate(BaseModel):
     ap_network_ids: Optional[list[int]] = None
     notes: Optional[str] = None
     admin_url: Optional[str] = None
+    icon: Optional[str] = None
     ips: Optional[list[DeviceIPCreate]] = None
 
 
