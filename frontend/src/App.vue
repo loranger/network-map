@@ -64,6 +64,12 @@
                     Emplacements
                   </router-link>
                 </li>
+                <li>
+                  <router-link to="/access" class="flex items-center gap-3">
+                    <ShieldKeyhole :size="18" :stroke-width="2" />
+                    Accès
+                  </router-link>
+                </li>
               </ul>
             </details>
           </li>
@@ -81,7 +87,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { Menu, Monitor, Network, Wifi, MapPin, Shapes, Settings, Layers, Sun, Moon } from '@lucide/vue'
+import { Menu, Monitor, Network, Wifi, MapPin, Shapes, Settings, Layers, Sun, Moon, ShieldKeyhole } from '@lucide/vue'
 
 const theme = ref('system')
 

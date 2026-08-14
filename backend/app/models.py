@@ -168,3 +168,10 @@ class Network(Base):
 
     ap_devices = relationship("Device", secondary=device_ap_networks,
                               back_populates="ap_networks")
+
+
+class Setting(Base):
+    __tablename__ = "settings"
+
+    key = Column(String, primary_key=True)
+    value = Column(Text, nullable=True)

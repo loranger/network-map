@@ -519,7 +519,12 @@ def mdns_hostname_map_all(timeout: int = 5) -> dict[str, str]:
         zc.close()
 
 
-def enrich_device(db: Session, device: models.Device, mdns_map: dict | None = None) -> dict:
+def enrich_device(
+    db: Session,
+    device: models.Device,
+    mdns_map: dict | None = None,
+    hostname_map: dict | None = None,
+) -> dict:
     updated = {}
     if not device.manufacturer:
         for ip in device.ips:
@@ -533,9 +538,11 @@ def enrich_device(db: Session, device: models.Device, mdns_map: dict | None = No
     if first_ip:
         hn = device.hostname
         if not hn:
-            hn = reverse_dns(first_ip)
+            hn = (hostname_map or {}).get(first_ip)
             if not hn and mdns_map:
                 hn = mdns_map.get(first_ip)
+            if not hn:
+                hn = reverse_dns(first_ip)
         if hn:
             if not device.hostname:
                 device.hostname = hn
@@ -552,9 +559,16 @@ def enrich_device(db: Session, device: models.Device, mdns_map: dict | None = No
 def enrich_all(db: Session) -> dict:
     devices = db.query(models.Device).all()
     total = len(devices)
+    from .freebox import freebox_hostname_map
+
+    hostname_map = {}
+    try:
+        hostname_map = freebox_hostname_map(db)
+    except Exception as e:
+        print(f"freebox API error: {e}")
     mdns_map = mdns_hostname_map_all()
     enriched = 0
     for device in devices:
-        if enrich_device(db, device, mdns_map):
+        if enrich_device(db, device, mdns_map, hostname_map):
             enriched += 1
     return {"total": total, "enriched": enriched}

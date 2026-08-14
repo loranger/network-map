@@ -6,6 +6,20 @@ from sqlalchemy.orm import Session, joinedload
 from . import models, schemas
 
 
+def get_setting(db: Session, key: str, default: str = None) -> str | None:
+    row = db.query(models.Setting).filter(models.Setting.key == key).first()
+    return row.value if row else default
+
+
+def set_setting(db: Session, key: str, value: str | None):
+    row = db.query(models.Setting).filter(models.Setting.key == key).first()
+    if row:
+        row.value = value
+    else:
+        db.add(models.Setting(key=key, value=value))
+    db.commit()
+
+
 def auto_assign_network(db: Session, device_ip: models.DeviceIP):
     if device_ip.network_id is not None or not device_ip.ipv4:
         return

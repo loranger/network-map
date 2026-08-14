@@ -8,6 +8,7 @@ import Networks from './views/Networks.vue'
 import Locations from './views/Locations.vue'
 import Floors from './views/Floors.vue'
 import DeviceTypes from './views/DeviceTypes.vue'
+import Access from './views/Access.vue'
 import './style.css'
 
 const routes = [
@@ -19,6 +20,7 @@ const routes = [
   { path: '/locations', component: Locations },
   { path: '/floors', component: Floors },
   { path: '/device-types', component: DeviceTypes },
+  { path: '/access', component: Access },
 ]
 
 const router = createRouter({

@@ -14,12 +14,12 @@ network-map/
 │   └── app/
 │       ├── main.py          # Points d'entrée FastAPI + routes
 │       ├── database.py      # Connexion SQLite + session
-│       ├── models.py        # Modèles SQLAlchemy (Device, SwitchPort, Connection, Network, Location, DeviceType)
+│       ├── models.py        # Modèles SQLAlchemy (Device, SwitchPort, Connection, Network, Location, DeviceType, Setting)
 │       ├── schemas.py       # Schémas Pydantic (validation sérialisation)
 │       ├── crud.py          # Opérations CRUD + construction du graphe
 │       ├── scanner.py       # Scan ARP réseau
-│       └── enricher.py      # Lookup OUI fabricant + reverse DNS
-├── scan-host.sh       # Script macOS : importe arp -a dans l'API
+│       ├── enricher.py      # Lookup OUI + reverse DNS + mDNS (zeroconf)
+│       └── freebox.py       # Table DHCP du LAN via l'API Freebox OS
 ├── frontend/          # Interface web Vue 3
 │   ├── Dockerfile
 │   ├── nginx.conf
@@ -39,10 +39,12 @@ network-map/
 │           ├── Networks.vue     # Gestion réseaux (CRUD + édition)
 │           ├── Locations.vue    # Gestion emplacements (CRUD, liés à un étage)
 │           ├── Floors.vue       # Gestion étages (CRUD, avec défaut)
-│           └── DeviceTypes.vue  # Gestion types (CRUD, couleur aléatoire sombre)
-├── devices.yaml       # Données initiales (périphériques) — conservé comme référence
-├── networks.yaml      # Données initiales (réseaux) — conservé comme référence
-├── docker-compose.yml # Orchestration complète
+│           ├── DeviceTypes.vue  # Gestion types (CRUD, couleur aléatoire sombre)
+│           └── Access.vue       # Gestion des tokens (appairage Freebox)
+├── scan-host.sh       # Importe arp -a de l'hôte dans l'API
+├── docker-compose.yml # Orchestration complète (ignoré par git)
+├── docker-compose.example
+├── .env.example       # Variables d'environnement documentées
 └── AGENTS.md          # Ce fichier
 ```
 
@@ -183,7 +185,7 @@ Stocké dans la table `device_types`. Type de périphérique avec libellé et co
 | color | String | Couleur hex (ex: #3b82f6) |
 | icon | String? | Nom de l'icône Lucide (ex: monitor, server) |
 
-Les types sont seedés au démarrage avec les couleurs d'origine. Les couleurs ne sont plus hardcodées nulle part — elles viennent de la DB via l'API. Ajout d'un nouveau type via l'UI génère une couleur aléatoire sombre (HSL, luminance 25–50%) et propose un sélecteur d'icône (parmi 437 icônes Lucide disponibles). Les icônes sont utilisées sur le graphe et dans la liste des périphériques.
+Les types sont seedés au démarrage avec les couleurs d'origine. Les couleurs ne sont plus hardcodées nulle part — elles viennent de la DB via l'API. Ajout d'un nouveau type via l'UI génère une couleur aléatoire sombre (HSL, luminance 25–50%) et propose un sélecteur d'icône (parmi 1502 icônes Lucide disponibles, avec recherche). Les icônes sont utilisées dans la liste des périphériques et dans la légende du graphe (pas sur les noeuds).
 
 ## API REST
 
@@ -313,11 +315,13 @@ Ce script envoie le output de `arp -a` du Mac à `POST /api/scan/import` qui cr�
 
 ## Enrichissement
 
-L'enrichissement (`POST /api/enrich` ou `POST /api/enrich/{id}`) combine :
-1. **Lookup OUI** : ~80 préfixes MAC connus pour identifier le fabricant (clés normalisées sans `:`, insensibles à la casse)
-2. **Reverse DNS** : résolution PTR de l'adresse IPv4
+L'enrichissement (`POST /api/enrich` ou `POST /api/enrich/{id}`) combine, pour le fabricant et le hostname :
+1. **Lookup OUI** : table de ~280 préfixes MAC pour identifier le fabricant (clés normalisées sans `:`, insensibles à la casse)
+2. **Table LAN Freebox** (`freebox.py`) : hostnames DHCP fournis par l'API Freebox OS (appairage via la page **Réglages → Accès**, jeton stocké en base)
+3. **mDNS/Bonjour** (`zeroconf`) : hostnames `.local` des appareils qui annoncent des services mDNS
+4. **Reverse DNS** : résolution PTR de l'adresse IPv4, bornée (2s) via dnspython + éventuel serveur `DNS_SERVERS`
 
-Si un hostname est trouvé par reverse DNS **et** que le nom du device commence par `device-`, le nom est automatiquement remplacé par le hostname court (partie avant le premier point).
+Si un hostname est trouvé **et** que le nom du device commence par `device-`, le nom est automatiquement remplacé par le hostname court (partie avant le premier point).
 
 ## Déploiement
 
@@ -361,7 +365,7 @@ Pour que nmap donne les vrais périphériques du LAN, le backend doit partager l
 - Python 3.13+ requis (le scan ARP et SQLAlchemy nécessitent la version système)
 - Node 26+ pour le build frontend
 - Le fichier de base de données SQLite est stocké dans un bind mount (`./datas:/app/data`)
-- Les fichiers `devices.yaml` et `networks.yaml` sont conservés comme traces historiques mais ne sont plus utilisés par l'application
+- Les fichiers `devices.yaml` et `networks.yaml` ont été supprimés — les données vivent en SQLite
 - Pas de système d'authentification (usage local / LAN uniquement)
 - Le frontend utilise un hash router (`createWebHashHistory`) pour fonctionner sans configuration serveur avancée
 
@@ -390,5 +394,8 @@ Avant de modifier ou d'étendre ce projet, consulter sur Context7 les documentat
 - **SQLAlchemy 2.0** — déclarative mapping, relationships, queries
 - **Docker Compose** — networking, volumes, healthchecks
 - **Nginx** — reverse proxy, configuration SPA
+- **Freebox OS API** — login/authorize (app_token), session, lan/browser (hosts)
+- **python-zeroconf** — mDNS/Bonjour, ServiceBrowser, listeners
+- **dnspython** — résolution DNS/PTR, resolver nameservers
 
 Ne pas deviner les API. Toujours vérifier la documentation officielle via Context7 avant d'écrire du code utilisant ces frameworks, en particulier pour les versions majeures récentes.

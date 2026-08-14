@@ -28,15 +28,14 @@ def _background_scan():
 async def periodic_scan_loop():
     minutes = int(os.environ.get("SCAN_INTERVAL_MINUTES", "15") or 0)
     if minutes <= 0:
+        print("Periodic scan: disabled (SCAN_INTERVAL_MINUTES <= 0)")
         return
     loop = asyncio.get_running_loop()
     lock = asyncio.Lock()
+    print(f"Periodic scan: started, interval {minutes} min")
     while True:
+        await loop.run_in_executor(None, _background_scan)
         await asyncio.sleep(minutes * 60)
-        if lock.locked():
-            continue
-        async with lock:
-            await loop.run_in_executor(None, _background_scan)
 
 
 @asynccontextmanager
@@ -679,12 +678,18 @@ def enrich(db: Session = Depends(get_db)):
 @app.post("/api/enrich/{device_id}")
 def enrich_device(device_id: int, db: Session = Depends(get_db)):
     from .enricher import enrich_device as do_enrich, mdns_hostname_map
+    from .freebox import freebox_hostname_map
     device = crud.get_device(db, device_id)
     if not device:
         raise HTTPException(status_code=404, detail="Device not found")
     first_ip = device.ips[0].ipv4 if device.ips else None
     mdns = {first_ip: mdns_hostname_map(first_ip)} if first_ip else {}
-    updated = do_enrich(db, device, mdns)
+    hostname_map = {}
+    try:
+        hostname_map = freebox_hostname_map(db)
+    except Exception as e:
+        print(f"freebox API error: {e}")
+    updated = do_enrich(db, device, mdns, hostname_map)
     db.refresh(device)
     device.location_name = device.location_ref.name if device.location_ref else None
     device.location_floor = device.location_ref.floor_ref.name if (device.location_ref and device.location_ref.floor_ref) else None
@@ -699,3 +704,56 @@ def enrich_device(device_id: int, db: Session = Depends(get_db)):
 @app.get("/api/graph", response_model=schemas.GraphData)
 def get_graph(db: Session = Depends(get_db)):
     return crud.get_graph_data(db)
+
+
+# --- Accès (tokens) ---
+
+@app.get("/api/access")
+def list_accesses(db: Session = Depends(get_db)):
+    from .freebox import freebox_config
+    cfg = freebox_config(db)
+    return {"accesses": [{
+        "service": "freebox",
+        "name": "Freebox",
+        "configured": cfg["configured"],
+        "base_url": cfg["base_url"],
+    }]}
+
+
+class PairInput(BaseModel):
+    base_url: Optional[str] = None
+
+
+@app.post("/api/access/freebox/pair")
+def freebox_pair(data: PairInput, db: Session = Depends(get_db)):
+    from .freebox import freebox_request_pair
+    base_url = (data.base_url or "").strip() or "http://192.168.1.254"
+    try:
+        track_id = freebox_request_pair(db, base_url)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Freebox: {e}")
+    return {"track_id": track_id, "message": "Validez l'autorisation sur l'écran de la Freebox."}
+
+
+@app.get("/api/access/freebox/pair")
+def freebox_pair_status(db: Session = Depends(get_db)):
+    from .freebox import freebox_pair_status as status_fn
+    return status_fn(db)
+
+
+class TokenInput(BaseModel):
+    token: str
+
+
+@app.post("/api/access/freebox/token")
+def freebox_token(data: TokenInput, db: Session = Depends(get_db)):
+    from .freebox import freebox_set_token
+    freebox_set_token(db, data.token.strip())
+    return {"ok": True}
+
+
+@app.delete("/api/access/freebox")
+def freebox_clear(db: Session = Depends(get_db)):
+    from .freebox import freebox_clear as clear_fn
+    clear_fn(db)
+    return {"ok": True}
