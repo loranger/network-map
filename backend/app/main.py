@@ -678,11 +678,13 @@ def enrich(db: Session = Depends(get_db)):
 
 @app.post("/api/enrich/{device_id}")
 def enrich_device(device_id: int, db: Session = Depends(get_db)):
-    from .enricher import enrich_device as do_enrich
+    from .enricher import enrich_device as do_enrich, mdns_hostname_map
     device = crud.get_device(db, device_id)
     if not device:
         raise HTTPException(status_code=404, detail="Device not found")
-    updated = do_enrich(db, device)
+    first_ip = device.ips[0].ipv4 if device.ips else None
+    mdns = {first_ip: mdns_hostname_map(first_ip)} if first_ip else {}
+    updated = do_enrich(db, device, mdns)
     db.refresh(device)
     device.location_name = device.location_ref.name if device.location_ref else None
     device.location_floor = device.location_ref.floor_ref.name if (device.location_ref and device.location_ref.floor_ref) else None

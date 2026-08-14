@@ -1,11 +1,13 @@
 import os
 import socket
 import threading
+import time
 from typing import Optional
 
 import dns.reversename
 import dns.resolver
 from sqlalchemy.orm import Session
+from zeroconf import IPVersion, ServiceBrowser, ServiceListener, Zeroconf
 
 from . import models
 
@@ -413,7 +415,111 @@ def reverse_dns(ip: str) -> Optional[str]:
     return _ptr_via_dns(ip)
 
 
-def enrich_device(db: Session, device: models.Device) -> dict:
+class _MdnsListener(ServiceListener):
+    def __init__(self, register):
+        self._service_types = set()
+        self._instances = {}
+        self._register = register
+
+    def add_service(self, zc, type_, name):
+        self._handle(zc, type_, name)
+
+    def update_service(self, zc, type_, name):
+        self._handle(zc, type_, name)
+
+    def remove_service(self, zc, type_, name):
+        pass
+
+    def _handle(self, zc, type_, name):
+        if type_ == "_services._dns-sd._udp.local.":
+            self._service_types.add(name)
+        else:
+            self._instances.setdefault(type_, set()).add(name)
+
+    def collect(self, browsers):
+        self._resolved = set()
+
+        def resolve():
+            for t, names in list(self._instances.items()):
+                for name in list(names):
+                    key = (t, name)
+                    if key in self._resolved:
+                        continue
+                    self._resolved.add(key)
+                    info = zc.get_service_info(t, name, timeout=500)
+                    if info is None:
+                        continue
+                    host = (info.server or "").rstrip(".")
+                    if not host:
+                        continue
+                    for addr in info.parsed_addresses():
+                        ip = str(addr)
+                        if ":" not in ip:
+                            self._register.setdefault(ip, host)
+
+        zc = browsers[0].zc if browsers else None
+        if zc is None:
+            return
+        resolve()
+
+
+def mdns_hostname_map(ip: str, timeout: int = 3) -> Optional[str]:
+    """Retourne le hostname mDNS (.local) de l'IP donnée."""
+    result: dict[str, str] = {}
+    browsers: list = []
+    zc = Zeroconf()
+    try:
+        listener = _MdnsListener(result)
+        browsers.append(ServiceBrowser(zc, "_services._dns-sd._udp.local.", listener))
+        deadline = time.time() + timeout
+        seen_types = set()
+        while time.time() < deadline:
+            for t in list(listener._service_types):
+                if t not in seen_types:
+                    seen_types.add(t)
+                    browsers.append(ServiceBrowser(zc, t, listener))
+            listener.collect(browsers)
+            if result.get(ip):
+                return result[ip]
+            time.sleep(0.5)
+        return result.get(ip)
+    finally:
+        for b in browsers:
+            try:
+                b.cancel()
+            except Exception:
+                pass
+        zc.close()
+
+
+def mdns_hostname_map_all(timeout: int = 5) -> dict[str, str]:
+    """Retourne un mapping {IP: hostname mDNS} de tout le LAN."""
+    result: dict[str, str] = {}
+    browsers: list = []
+    zc = Zeroconf()
+    try:
+        listener = _MdnsListener(result)
+        browsers.append(ServiceBrowser(zc, "_services._dns-sd._udp.local.", listener))
+        deadline = time.time() + timeout
+        seen_types = set()
+        while time.time() < deadline:
+            for t in list(listener._service_types):
+                if t not in seen_types:
+                    seen_types.add(t)
+                    browsers.append(ServiceBrowser(zc, t, listener))
+            listener.collect(browsers)
+            time.sleep(0.5)
+        return result
+    finally:
+        for b in browsers:
+            try:
+                b.cancel()
+            except Exception:
+                pass
+        zc.close()
+
+
+def enrich_device(db: Session, device: models.Device, mdns_map: dict | None = None) -> dict:
     updated = {}
     if not device.manufacturer:
         for ip in device.ips:
@@ -425,7 +531,11 @@ def enrich_device(db: Session, device: models.Device) -> dict:
                     break
     first_ip = device.ips[0].ipv4 if device.ips else None
     if first_ip:
-        hn = reverse_dns(first_ip) if not device.hostname else device.hostname
+        hn = device.hostname
+        if not hn:
+            hn = reverse_dns(first_ip)
+            if not hn and mdns_map:
+                hn = mdns_map.get(first_ip)
         if hn:
             if not device.hostname:
                 device.hostname = hn
@@ -442,8 +552,9 @@ def enrich_device(db: Session, device: models.Device) -> dict:
 def enrich_all(db: Session) -> dict:
     devices = db.query(models.Device).all()
     total = len(devices)
+    mdns_map = mdns_hostname_map_all()
     enriched = 0
     for device in devices:
-        if enrich_device(db, device):
+        if enrich_device(db, device, mdns_map):
             enriched += 1
     return {"total": total, "enriched": enriched}
