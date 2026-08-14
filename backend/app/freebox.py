@@ -113,7 +113,11 @@ def freebox_hostname_map(db: Session) -> dict[str, str]:
 
     result: dict[str, str] = {}
     for iface in interfaces:
-        hosts = _api(base_url, f"lan/browser/{iface['name']}/", headers=headers)["result"]
+        hosts_data = _api(base_url, f"lan/browser/{iface['name']}/", headers=headers)
+        if "result" not in hosts_data:
+            print(f"freebox debug: réponse lan/browser inattendue pour {iface['name']}: {hosts_data}")
+            continue
+        hosts = hosts_data["result"]
         for host in hosts:
             names = host.get("names") or []
             name = host.get("primary_name") or (names[0].get("name") if names else None)
