@@ -311,7 +311,9 @@ const portConnectionMap = computed(() => {
 })
 
 const availableDevices = computed(() =>
-  allDevices.value.filter(d => d.id !== device.value?.id)
+  allDevices.value
+    .filter(d => d.id !== device.value?.id)
+    .sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()))
 )
 
 const firstIp = computed(() =>
