@@ -212,7 +212,12 @@ const form = ref({
 
 const filteredDevices = computed(() => {
   let list = devices.value.filter(d => {
-    if (filterName.value && !d.name.toLowerCase().includes(filterName.value.toLowerCase())) return false
+    if (filterName.value) {
+      const q = filterName.value.toLowerCase()
+      const nameMatch = d.name.toLowerCase().includes(q)
+      const ipMatch = (d.ips || []).some(ip => (ip.ipv4 || '').toLowerCase().includes(q))
+      if (!nameMatch && !ipMatch) return false
+    }
     if (filterType.value && d.device_type !== filterType.value) return false
     if (filterLocation.value && d.location_id !== Number(filterLocation.value)) return false
     if (filterNetwork.value) {
