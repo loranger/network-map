@@ -32,7 +32,10 @@ def _api(base_url: str, path: str, method: str = "GET", body: dict | None = None
     url = f"{base_url}/api/{_API_VERSION}/{path}"
     resp = requests.request(method, url, json=body, headers=headers, timeout=_TIMEOUT)
     resp.raise_for_status()
-    return resp.json()
+    data = resp.json()
+    if not data.get("success"):
+        raise RuntimeError(f"Freebox {path}: {data.get('error_code') or data.get('msg') or 'unknown error'}")
+    return data
 
 
 def _session_token(base_url: str, app_token: str) -> str:
