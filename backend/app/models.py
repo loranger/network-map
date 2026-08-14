@@ -64,6 +64,7 @@ class Device(Base):
     manufacturer = Column(String, nullable=True)
     model = Column(String, nullable=True)
     hostname = Column(String, nullable=True)
+    hostname_manual = Column(Boolean, default=False)
     location = Column(String, nullable=True)
     floor = Column(String, nullable=True)
     location_id = Column(Integer, ForeignKey("locations.id", ondelete="SET NULL"), nullable=True)

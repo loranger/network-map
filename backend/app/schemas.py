@@ -121,6 +121,7 @@ class DeviceResponse(DeviceBase):
     id: int
     discovered: bool
     online: bool
+    hostname_manual: bool = False
     last_seen: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime

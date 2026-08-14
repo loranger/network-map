@@ -181,6 +181,16 @@ async def lifespan(app: FastAPI):
             conn.commit()
         except Exception:
             pass
+        try:
+            conn.execute(sql_text("ALTER TABLE devices ADD COLUMN hostname_manual BOOLEAN"))
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            conn.execute(sql_text("UPDATE devices SET hostname_manual = 0 WHERE hostname_manual IS NULL"))
+            conn.commit()
+        except Exception:
+            pass
     with Session(engine) as session:
         # --- Add floor_id column to locations if missing ---
         try:

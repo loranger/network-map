@@ -535,14 +535,16 @@ def enrich_device(
                     updated["manufacturer"] = mfr
                     break
     first_ip = device.ips[0].ipv4 if device.ips else None
-    if first_ip:
+    if first_ip and not device.hostname_manual:
         hn = device.hostname
-        if not hn:
-            hn = (hostname_map or {}).get(first_ip)
-            if not hn and mdns_map:
-                hn = mdns_map.get(first_ip)
-            if not hn:
-                hn = reverse_dns(first_ip)
+        fb = (hostname_map or {}).get(first_ip)
+        md = (mdns_map or {}).get(first_ip)
+        if hn and hn.endswith(".local"):
+            better = fb or md
+            if better and better != hn and not better.endswith(".local"):
+                hn = better
+        elif not hn:
+            hn = fb or md or reverse_dns(first_ip)
         if hn:
             if not device.hostname:
                 device.hostname = hn

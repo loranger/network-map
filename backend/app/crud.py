@@ -109,6 +109,8 @@ def update_device(db: Session, device_id: int, device: schemas.DeviceUpdate):
             db.add(device_ip)
             if ip_entry.get("ipv4"):
                 existing_ips.add(ip_entry["ipv4"])
+    if "hostname" in data and data["hostname"] != db_device.hostname:
+        db_device.hostname_manual = True
     for key, value in data.items():
         setattr(db_device, key, value)
     db.commit()
