@@ -126,12 +126,27 @@ function buildGraph(data) {
     })
   }
 
+  const ORPHAN_GROUP_ID = 'virt-orphans'
+  const hasOrphans = data.nodes.some(n => !(n.location && n.location_id) && !n.floor)
+  if (hasOrphans) {
+    elements.push({
+      data: {
+        id: ORPHAN_GROUP_ID,
+        label: 'Sans emplacement',
+        color: '#64748b',
+      },
+      classes: 'virtual',
+    })
+  }
+
   for (const n of data.nodes) {
     let parent = undefined
     if (n.location && n.location_id) {
       parent = `loc-${n.location_id}`
     } else if (n.floor) {
       parent = `floor-${n.floor}`
+    } else if (hasOrphans) {
+      parent = ORPHAN_GROUP_ID
     }
     elements.push({
       data: {
@@ -202,6 +217,29 @@ function buildGraph(data) {
           'compound-sizing-wrt-labels': 'include',
           'min-width': '120px',
           'min-height': '100px',
+        },
+      },
+      {
+        selector: 'node.virtual',
+        style: {
+          label: 'data(label)',
+          'background-color': 'data(color)',
+          'background-opacity': 0.008,
+          'border-color': 'data(color)',
+          'border-width': 1,
+          'border-style': 'dashed',
+          'border-opacity': 0.18,
+          'text-valign': 'top',
+          'text-halign': 'center',
+          'font-size': '11px',
+          'font-style': 'italic',
+          'text-opacity': 0.3,
+          color: 'data(color)',
+          'padding': '14px',
+          'shape': 'round-rectangle',
+          'compound-sizing-wrt-labels': 'include',
+          'min-width': '100px',
+          'min-height': '60px',
         },
       },
       {
@@ -385,6 +423,9 @@ function applyVisibility() {
   })
   cy.nodes('node.floor').forEach(floor => {
     floor.style('display', hasVisibleChild(floor) ? 'element' : 'none')
+  })
+  cy.nodes('node.virtual').forEach(vg => {
+    vg.style('display', hasVisibleChild(vg) ? 'element' : 'none')
   })
 }
 
